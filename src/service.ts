@@ -1,0 +1,51 @@
+import { stat } from "node:fs/promises";
+
+import { loadCsvFile } from "./csvLoader.js";
+import { buildDictionary } from "./dictionary.js";
+import { convertTerms } from "./matcher.js";
+import type { ConvertTermsInput, ConvertTermsOutput, TermDictionary } from "./types.js";
+
+export class TermDictionaryService {
+  private dictionary?: TermDictionary;
+  private loadedMtimeMs?: number;
+
+  constructor(private readonly csvPath: string) {}
+
+  async convert(input: ConvertTermsInput): Promise<ConvertTermsOutput> {
+    const reloadWarning = await this.ensureLoaded();
+    const result = convertTerms(this.dictionary!, input);
+    if (reloadWarning) {
+      return {
+        ...result,
+        warnings: [...result.warnings, reloadWarning]
+      };
+    }
+    return result;
+  }
+
+  get path(): string {
+    return this.csvPath;
+  }
+
+  private async ensureLoaded(): Promise<string | undefined> {
+    const fileStat = await stat(this.csvPath);
+    if (this.dictionary && this.loadedMtimeMs === fileStat.mtimeMs) {
+      return undefined;
+    }
+
+    try {
+      const rows = await loadCsvFile(this.csvPath);
+      this.dictionary = buildDictionary(rows);
+      this.loadedMtimeMs = fileStat.mtimeMs;
+      return undefined;
+    } catch (error) {
+      if (!this.dictionary) {
+        throw error;
+      }
+
+      return `Reload failed for ${this.csvPath}; using the last successfully loaded dictionary. ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+    }
+  }
+}

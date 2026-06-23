@@ -1,0 +1,908 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MCP로 도메인 사전을 AI 도구처럼 쓰기</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f8fb;
+      --paper: #ffffff;
+      --ink: #18212f;
+      --muted: #5d6b7c;
+      --line: #dbe3ef;
+      --blue: #2563eb;
+      --green: #0f9f6e;
+      --amber: #b7791f;
+      --red: #c2413d;
+      --navy: #23324d;
+      --soft-blue: #eaf2ff;
+      --soft-green: #e8f7f0;
+      --soft-amber: #fff4db;
+      --soft-red: #fff0ef;
+      --shadow: 0 18px 45px rgba(35, 50, 77, 0.12);
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-snap-type: y mandatory;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background:
+        linear-gradient(180deg, rgba(37, 99, 235, 0.08), rgba(15, 159, 110, 0.06) 42%, rgba(246, 248, 251, 1) 72%),
+        var(--bg);
+      font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
+      line-height: 1.55;
+      letter-spacing: 0;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .slide {
+      min-height: 100vh;
+      scroll-snap-align: start;
+      padding: 72px 7vw 64px;
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid rgba(219, 227, 239, 0.85);
+    }
+
+    .slide-inner {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 16px;
+      color: var(--blue);
+      font-size: 0.92rem;
+      font-weight: 800;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      max-width: 920px;
+      margin-bottom: 22px;
+      color: var(--navy);
+      font-size: clamp(2.4rem, 7vw, 5.2rem);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      max-width: 860px;
+      margin-bottom: 18px;
+      color: var(--navy);
+      font-size: clamp(2rem, 4.5vw, 3.7rem);
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin-bottom: 10px;
+      color: var(--navy);
+      font-size: clamp(1.05rem, 1.9vw, 1.28rem);
+      line-height: 1.25;
+    }
+
+    .lead {
+      max-width: 790px;
+      color: var(--muted);
+      font-size: clamp(1.08rem, 2.4vw, 1.42rem);
+      line-height: 1.65;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .hero-grid,
+    .two-col,
+    .three-col {
+      display: grid;
+      gap: 22px;
+      align-items: stretch;
+    }
+
+    .hero-grid {
+      grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+      margin-top: 44px;
+    }
+
+    .two-col {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-top: 34px;
+    }
+
+    .three-col {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-top: 34px;
+    }
+
+    .card {
+      min-width: 0;
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: var(--shadow);
+    }
+
+    .card.tight {
+      padding: 18px;
+      box-shadow: none;
+    }
+
+    .card.blue {
+      background: var(--soft-blue);
+      border-color: #bcd4ff;
+    }
+
+    .card.green {
+      background: var(--soft-green);
+      border-color: #b9ead8;
+    }
+
+    .card.amber {
+      background: var(--soft-amber);
+      border-color: #f3d493;
+    }
+
+    .card.red {
+      background: var(--soft-red);
+      border-color: #fac5c2;
+    }
+
+    .metric {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--blue);
+      font-size: clamp(1.75rem, 4vw, 3.1rem);
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      align-items: center;
+      margin-top: 34px;
+    }
+
+    .flow-item {
+      min-height: 146px;
+      padding: 18px 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+      text-align: center;
+      box-shadow: 0 10px 26px rgba(35, 50, 77, 0.08);
+    }
+
+    .flow-item strong {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--navy);
+      font-size: 1.05rem;
+    }
+
+    .flow-item span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .arrow {
+      color: var(--blue);
+      font-size: 1.55rem;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 34px;
+    }
+
+    .pipeline-step {
+      position: relative;
+      min-height: 175px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+    }
+
+    .pipeline-step::before {
+      content: attr(data-step);
+      display: inline-flex;
+      width: 34px;
+      height: 34px;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      border-radius: 50%;
+      color: #fff;
+      background: var(--blue);
+      font-weight: 900;
+    }
+
+    .compare {
+      width: 100%;
+      margin-top: 32px;
+      border-collapse: collapse;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+
+    .compare th,
+    .compare td {
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .compare th {
+      color: var(--navy);
+      background: #edf4ff;
+      font-size: 0.94rem;
+    }
+
+    .compare tr:last-child td {
+      border-bottom: 0;
+    }
+
+    code,
+    .code {
+      padding: 2px 6px;
+      border-radius: 6px;
+      color: #10213d;
+      background: #edf2f7;
+      font-family: "SFMono-Regular", "Consolas", "Liberation Mono", monospace;
+      font-size: 0.94em;
+      overflow-wrap: anywhere;
+    }
+
+    .code-block {
+      margin: 0;
+      padding: 20px;
+      overflow-x: auto;
+      border: 1px solid #cbd9ef;
+      border-radius: var(--radius);
+      color: #18212f;
+      background: #f8fbff;
+      font-family: "SFMono-Regular", "Consolas", "Liberation Mono", monospace;
+      font-size: clamp(0.9rem, 1.5vw, 1rem);
+      line-height: 1.7;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      padding: 7px 12px;
+      border: 1px solid #bcd4ff;
+      border-radius: 999px;
+      color: var(--navy);
+      background: var(--soft-blue);
+      font-size: 0.94rem;
+      font-weight: 800;
+    }
+
+    .callout {
+      margin-top: 30px;
+      padding: 22px;
+      border-left: 5px solid var(--green);
+      border-radius: var(--radius);
+      background: var(--soft-green);
+    }
+
+    .callout.warning {
+      border-left-color: var(--amber);
+      background: var(--soft-amber);
+    }
+
+    .callout.danger {
+      border-left-color: var(--red);
+      background: var(--soft-red);
+    }
+
+    .source-list {
+      display: grid;
+      gap: 10px;
+      margin: 24px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .source-list a {
+      color: var(--blue);
+      font-weight: 800;
+      text-decoration: none;
+    }
+
+    .nav-progress {
+      position: fixed;
+      right: 20px;
+      bottom: 18px;
+      z-index: 10;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid rgba(219, 227, 239, 0.9);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.88);
+      box-shadow: 0 10px 28px rgba(35, 50, 77, 0.14);
+      backdrop-filter: blur(8px);
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border: 0;
+      border-radius: 50%;
+      background: #b8c5d8;
+      cursor: pointer;
+    }
+
+    .dot.active {
+      width: 26px;
+      border-radius: 999px;
+      background: var(--blue);
+    }
+
+    .slide-count {
+      min-width: 54px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 800;
+      text-align: right;
+    }
+
+    .diagram-label {
+      display: inline-flex;
+      margin-bottom: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      color: var(--blue);
+      background: var(--soft-blue);
+      font-weight: 900;
+      font-size: 0.86rem;
+    }
+
+    .quote {
+      max-width: 860px;
+      margin: 36px 0 0;
+      padding: 30px;
+      border: 1px solid #bcd4ff;
+      border-radius: var(--radius);
+      color: var(--navy);
+      background: #f8fbff;
+      font-size: clamp(1.25rem, 2.6vw, 2rem);
+      font-weight: 900;
+      line-height: 1.45;
+    }
+
+    .benefit-list {
+      display: grid;
+      gap: 14px;
+      margin: 26px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .benefit-list li {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+    }
+
+    .benefit-list li::before {
+      content: "✓";
+      display: inline-flex;
+      flex: 0 0 28px;
+      width: 28px;
+      height: 28px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      color: #fff;
+      background: var(--green);
+      font-weight: 900;
+    }
+
+    @media (max-width: 940px) {
+      .slide {
+        padding: 58px 5vw 62px;
+      }
+
+      .hero-grid,
+      .two-col,
+      .three-col,
+      .pipeline {
+        grid-template-columns: 1fr;
+      }
+
+      .flow {
+        grid-template-columns: 1fr;
+      }
+
+      .arrow {
+        transform: rotate(90deg);
+      }
+
+      .flow-item {
+        min-height: auto;
+      }
+
+      .compare {
+        display: block;
+        overflow-x: auto;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .slide {
+        min-height: auto;
+        padding: 44px 18px 56px;
+      }
+
+      h1 {
+        font-size: 2.35rem;
+      }
+
+      h2 {
+        font-size: 2rem;
+      }
+
+      .card,
+      .pipeline-step,
+      .quote {
+        padding: 18px;
+      }
+
+      .nav-progress {
+        right: 10px;
+        left: 10px;
+        justify-content: center;
+        overflow-x: auto;
+      }
+
+      .slide-count {
+        display: none;
+      }
+    }
+
+    @media print {
+      html {
+        scroll-snap-type: none;
+      }
+
+      body {
+        background: #fff;
+      }
+
+      .slide {
+        min-height: 100vh;
+        page-break-after: always;
+        border-bottom: 0;
+      }
+
+      .nav-progress {
+        display: none;
+      }
+
+      .card,
+      .compare {
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="slide" id="slide-1" aria-labelledby="title-1">
+      <div class="slide-inner">
+        <p class="eyebrow">mcp-variable presentation</p>
+        <h1 id="title-1">MCP로 도메인 사전을 AI 도구처럼 쓰기</h1>
+        <p class="lead">
+          이 문서는 MCP의 기본 개념부터, 한글 용어명·물리명·변수명 변환을 빠르게 제공하는
+          <strong>mcp-variable</strong> 프로젝트의 역할까지 한 번에 이해할 수 있도록 만든 프리젠테이션입니다.
+        </p>
+        <div class="hero-grid" aria-label="핵심 메시지">
+          <div class="card blue">
+            <span class="metric">1개 도구</span>
+            <h3><code>convert_terms</code></h3>
+            <p>AI가 사내 도메인 사전을 직접 조회해 표준 용어와 변수명을 변환합니다.</p>
+          </div>
+          <div class="card green">
+            <span class="metric">빠른 판단</span>
+            <h3>기존 용어인지, 신규 요청인지</h3>
+            <p>사전에 없는 용어는 <code>confidence: none</code>으로 구분해 추가 요청 판단을 돕습니다.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" id="slide-2" aria-labelledby="title-2">
+      <div class="slide-inner">
+        <p class="eyebrow">MCP basics</p>
+        <h2 id="title-2">MCP란 무엇인가?</h2>
+        <p class="lead">
+          MCP(Model Context Protocol)는 AI 애플리케이션이 외부 시스템의 데이터와 도구를
+          표준 방식으로 연결해 사용할 수 있게 해주는 오픈 프로토콜입니다.
+        </p>
+        <div class="three-col">
+          <article class="card">
+            <h3>AI 애플리케이션</h3>
+            <p>Claude, ChatGPT, IDE, CLI 같은 도구가 사용자의 요청을 이해합니다.</p>
+          </article>
+          <article class="card">
+            <h3>외부 도구와 데이터</h3>
+            <p>파일, 데이터베이스, API, 사내 기준정보 같은 실제 근거를 제공합니다.</p>
+          </article>
+          <article class="card">
+            <h3>표준 연결 방식</h3>
+            <p>각 도구마다 따로 붙이는 대신, MCP라는 공통 방식으로 연결합니다.</p>
+          </article>
+        </div>
+        <div class="callout">
+          <strong>쉬운 비유:</strong> MCP는 AI 애플리케이션을 외부 시스템과 연결하는 표준 포트입니다.
+          AI가 기억이나 추측에만 의존하지 않고, 필요한 도구를 호출해 확인할 수 있게 합니다.
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" id="slide-3" aria-labelledby="title-3">
+      <div class="slide-inner">
+        <p class="eyebrow">Why it matters</p>
+        <h2 id="title-3">왜 필요한가?</h2>
+        <p class="lead">
+          AI는 말을 잘하지만, 사내 표준 용어와 최신 기준정보를 자동으로 아는 것은 아닙니다.
+          MCP는 AI가 정확한 출처를 가진 도구를 호출하게 만들어 이 문제를 줄입니다.
+        </p>
+        <div class="two-col">
+          <article class="card red">
+            <h3>MCP 없이 물어보면</h3>
+            <ul class="benefit-list">
+              <li>AI가 학습 데이터나 웹 검색을 기준으로 답할 수 있습니다.</li>
+              <li>사내 도메인 사전과 다른 용어를 제안할 수 있습니다.</li>
+              <li>없는 단어도 그럴듯하게 만들어낼 위험이 있습니다.</li>
+            </ul>
+          </article>
+          <article class="card green">
+            <h3>MCP 도구로 물어보면</h3>
+            <ul class="benefit-list">
+              <li>정해진 CSV 도메인 사전만 기준으로 변환합니다.</li>
+              <li>정확히 있으면 변환하고, 없으면 없다고 알려줍니다.</li>
+              <li>개발자가 표준명과 변수명을 빠르게 확인할 수 있습니다.</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" id="slide-4" aria-labelledby="title-4">
+      <div class="slide-inner">
+        <p class="eyebrow">Architecture</p>
+        <h2 id="title-4">MCP는 이렇게 연결됩니다</h2>
+        <p class="lead">
+          사용자는 AI에게 자연어로 요청하고, AI 애플리케이션은 MCP Client를 통해
+          MCP Server의 도구를 발견하고 호출합니다.
+        </p>
+        <div class="flow" aria-label="MCP 연결 구조">
+          <div class="flow-item">
+            <strong>사용자</strong>
+            <span>“이 한글명을 변수명으로 바꿔줘”</span>
+          </div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="flow-item">
+            <strong>MCP Host</strong>
+            <span>AI 앱 또는 IDE가 요청을 해석</span>
+          </div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="flow-item">
+            <strong>MCP Client</strong>
+            <span>연결된 MCP Server와 통신</span>
+          </div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="flow-item">
+            <strong>MCP Server</strong>
+            <span>도구, 리소스, 프롬프트 제공</span>
+          </div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="flow-item">
+            <strong>Tool 실행</strong>
+            <span><code>convert_terms</code> 호출</span>
+          </div>
+        </div>
+        <p class="small">
+          공식 MCP 아키텍처는 Host, Client, Server 구조와 JSON-RPC 기반 데이터 계층,
+          stdio 또는 HTTP 기반 전송 계층으로 설명됩니다.
+        </p>
+      </div>
+    </section>
+
+    <section class="slide" id="slide-5" aria-labelledby="title-5">
+      <div class="slide-inner">
+        <p class="eyebrow">Project role</p>
+        <h2 id="title-5">이 프로젝트는 무엇을 하나요?</h2>
+        <p class="lead">
+          <strong>mcp-variable</strong>은 CSV로 관리되는 도메인 사전을 읽어
+          한글 용어명, 물리명, 변수명을 빠르게 변환하는 로컬 MCP 서버입니다.
+        </p>
+        <div class="pipeline" aria-label="mcp-variable 처리 흐름">
+          <article class="pipeline-step" data-step="1">
+            <h3>CSV 사전 로딩</h3>
+            <p>용어명, 물리명, 도메인유형, 도메인, 데이터타입 컬럼을 읽습니다.</p>
+          </article>
+          <article class="pipeline-step" data-step="2">
+            <h3>메모리 인덱스</h3>
+            <p>용어명과 물리명을 빠르게 찾도록 속성, 단어, 도메인 맵을 만듭니다.</p>
+          </article>
+          <article class="pipeline-step" data-step="3">
+            <h3>도구 호출</h3>
+            <p>MCP Client가 <code>convert_terms</code> 도구를 호출합니다.</p>
+          </article>
+          <article class="pipeline-step" data-step="4">
+            <h3>구조화 응답</h3>
+            <p>변환 결과, 신뢰도, 후보, 미매칭 항목을 함께 돌려줍니다.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" id="slide-6" aria-labelledby="title-6">
+      <div class="slide-inner">
+        <p class="eyebrow">Conversion example</p>
+        <h2 id="title-6">한글명·물리명·변수명을 한 번에 연결합니다</h2>
+        <p class="lead">
+          도메인 사전에 등록된 표준 용어는 전체 속성명으로 정확히 변환하고,
+          물리명 기반 camel case도 다시 한글 용어명으로 되돌릴 수 있습니다.
+        </p>
+        <table class="compare" aria-label="변환 예시">
+          <thead>
+            <tr>
+              <th>한글 용어명</th>
+              <th>물리명</th>
+              <th>변수명 lowerCamel</th>
+              <th>결과 상태</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>라우팅결과값</td>
+              <td><code>ROTNG_RSLT_VAL</code></td>
+              <td><code>rotngRsltVal</code></td>
+              <td><code>exact</code></td>
+            </tr>
+            <tr>
+              <td>등록일자</td>
+              <td><code>REG_YMD</code></td>
+              <td><code>regYmd</code></td>
+              <td><code>exact</code></td>
+            </tr>
+            <tr>
+              <td>API사용여부</td>
+              <td><code>API_USE_YN</code></td>
+              <td><code>apiUseYn</code></td>
+              <td><code>exact</code></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="pill-row" aria-label="지원 방향">
+          <span class="pill">한글 → 물리명</span>
+          <span class="pill">물리명 → 한글</span>
+          <span class="pill">camel → 한글</span>
+          <span class="pill">snake → lowerCamel</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" id="slide-7" aria-labelledby="title-7">
+      <div class="slide-inner">
+        <p class="eyebrow">Bulk conversion</p>
+        <h2 id="title-7">대량 변환도 줄 단위로 처리합니다</h2>
+        <p class="lead">
+          여러 한글명을 한 번에 넣으면 같은 순서로 변수명을 반환합니다.
+          반복적인 변수명 생성 작업을 빠르게 줄일 수 있습니다.
+        </p>
+        <div class="two-col">
+          <article class="card">
+            <span class="diagram-label">입력</span>
+            <pre class="code-block">가산비율
+가산세
+가산월수
+가산일수
+가상계좌번호</pre>
+          </article>
+          <article class="card green">
+            <span class="diagram-label">lowerCamel 결과</span>
+            <pre class="code-block">adtnRt
+addtx
+adtnMmCnt
+adtnDayCnt
+vrActno</pre>
+          </article>
+        </div>
+        <div class="callout">
+          응답의 <code>items</code>에는 각 줄별 상세 결과가 들어가고,
+          <code>summary</code>에는 전체 건수와 <code>exact</code>, <code>partial</code>, <code>none</code> 집계가 들어갑니다.
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" id="slide-8" aria-labelledby="title-8">
+      <div class="slide-inner">
+        <p class="eyebrow">Dictionary governance</p>
+        <h2 id="title-8">도메인 사전 연계가 주는 핵심 가치</h2>
+        <p class="lead">
+          이 도구의 목적은 단순 변환을 넘어, 표준 사전과 개발 작업 사이의 거리를 줄이는 것입니다.
+        </p>
+        <div class="three-col">
+          <article class="card blue">
+            <h3>기존 용어 확인</h3>
+            <p>동일한 한글명이 이미 등록되어 있으면 물리명과 변수명을 바로 확인합니다.</p>
+          </article>
+          <article class="card amber">
+            <h3>후보와 부분 매칭</h3>
+            <p>검증된 단어와 도메인 조합으로 가능한 후보를 보여주고 애매함은 표시합니다.</p>
+          </article>
+          <article class="card red">
+            <h3>미등록 판단</h3>
+            <p>사전에 없으면 <code>confidence: none</code>으로 응답해 신규 추가 요청 여부를 빠르게 판단합니다.</p>
+          </article>
+        </div>
+        <div class="callout warning">
+          예: <code>아라</code>처럼 사전에 없는 단어는 변환 결과를 꾸며내지 않고
+          <code>unmatched: ["아라"]</code>로 알려줍니다.
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" id="slide-9" aria-labelledby="title-9">
+      <div class="slide-inner">
+        <p class="eyebrow">Developer impact</p>
+        <h2 id="title-9">개발에는 어떤 도움이 되나요?</h2>
+        <p class="lead">
+          변수명은 작은 문제처럼 보이지만, 프로젝트가 커질수록 표준화와 리뷰 비용에 큰 영향을 줍니다.
+        </p>
+        <div class="three-col">
+          <article class="card">
+            <span class="metric">표준화</span>
+            <h3>팀 기준에 맞는 이름</h3>
+            <p>같은 의미의 용어가 여러 이름으로 흩어지는 일을 줄입니다.</p>
+          </article>
+          <article class="card">
+            <span class="metric">속도</span>
+            <h3>반복 작업 감소</h3>
+            <p>사전 검색, 약어 확인, camel 변환을 한 번의 도구 호출로 처리합니다.</p>
+          </article>
+          <article class="card">
+            <span class="metric">협업</span>
+            <h3>리뷰 기준 명확화</h3>
+            <p>변수명 논쟁을 줄이고, 사전에 없는 항목은 신규 요청으로 분리합니다.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" id="slide-10" aria-labelledby="title-10">
+      <div class="slide-inner">
+        <p class="eyebrow">Closing</p>
+        <h2 id="title-10">AI가 웹을 찾는 대신 사내 사전을 호출하게 만든다</h2>
+        <p class="lead">
+          MCP는 AI와 사내 시스템 사이의 표준 연결 방식이고,
+          mcp-variable은 그 연결을 도메인 사전과 변수명 생성 업무에 적용한 예입니다.
+        </p>
+        <div class="quote">
+          “개발자는 이름을 고민하는 시간을 줄이고, AI는 기준 데이터에 근거한 답을 제공합니다.”
+        </div>
+        <ul class="source-list" aria-label="참고 자료">
+          <li>참고: <a href="https://modelcontextprotocol.io/docs/getting-started/intro">Model Context Protocol 소개</a></li>
+          <li>참고: <a href="https://modelcontextprotocol.io/docs/learn/architecture">Model Context Protocol 아키텍처</a></li>
+          <li>프로젝트 도구: <code>convert_terms</code> from <code>mcp-variable</code></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <nav class="nav-progress" aria-label="슬라이드 이동">
+    <button class="dot active" type="button" aria-label="1번 슬라이드로 이동" data-target="slide-1"></button>
+    <button class="dot" type="button" aria-label="2번 슬라이드로 이동" data-target="slide-2"></button>
+    <button class="dot" type="button" aria-label="3번 슬라이드로 이동" data-target="slide-3"></button>
+    <button class="dot" type="button" aria-label="4번 슬라이드로 이동" data-target="slide-4"></button>
+    <button class="dot" type="button" aria-label="5번 슬라이드로 이동" data-target="slide-5"></button>
+    <button class="dot" type="button" aria-label="6번 슬라이드로 이동" data-target="slide-6"></button>
+    <button class="dot" type="button" aria-label="7번 슬라이드로 이동" data-target="slide-7"></button>
+    <button class="dot" type="button" aria-label="8번 슬라이드로 이동" data-target="slide-8"></button>
+    <button class="dot" type="button" aria-label="9번 슬라이드로 이동" data-target="slide-9"></button>
+    <button class="dot" type="button" aria-label="10번 슬라이드로 이동" data-target="slide-10"></button>
+    <span class="slide-count" aria-live="polite">1 / 10</span>
+  </nav>
+
+  <script>
+    const slides = Array.from(document.querySelectorAll(".slide"));
+    const dots = Array.from(document.querySelectorAll(".dot"));
+    const count = document.querySelector(".slide-count");
+
+    dots.forEach((dot) => {
+      dot.addEventListener("click", () => {
+        document.getElementById(dot.dataset.target).scrollIntoView({ behavior: "smooth" });
+      });
+    });
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+
+        if (!visible) {
+          return;
+        }
+
+        const index = slides.indexOf(visible.target);
+        dots.forEach((dot, dotIndex) => {
+          dot.classList.toggle("active", dotIndex === index);
+        });
+        count.textContent = `${index + 1} / ${slides.length}`;
+      },
+      { threshold: [0.35, 0.6, 0.85] }
+    );
+
+    slides.forEach((slide) => observer.observe(slide));
+  </script>
+</body>
+</html>

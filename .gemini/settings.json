@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "mcp-variable": {
+      "command": "node",
+      "args": [
+        "/Users/k/DEV/mcp-variable/dist/server.js",
+        "--csv",
+        "/Users/k/DEV/mcp-variable/data/terms.csv"
+      ],
+      "timeout": 30000,
+      "trust": true,
+      "description": "CSV-backed Korean term and physical-name converter"
+    }
+  }
+}
