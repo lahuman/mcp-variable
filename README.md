@@ -133,19 +133,48 @@ npm run typecheck
 npm run build
 ```
 
-## Codex 스킬
+## 스킬과 에이전트 지침
 
 프로그램 작성 중 변수명, DTO 필드명, API payload key, SQL alias 등을 만들 때
-`mcp-variable` 사전을 먼저 사용하도록 안내하는 스킬을 제공합니다.
+`mcp-variable` 사전을 먼저 사용하도록 Gemini/Antigravity 기준의 스킬과 에이전트 지침을 함께 제공합니다.
 
-- 스킬 파일: `skills/mcp-variable-naming/SKILL.md`
-- 사용 목적: 한글 업무 용어 기반 변수명을 임의 번역하지 않고 `convert_terms` 결과로 생성
-- 기본 정책: 코드 식별자는 `lowerCamel`, DB/물리명은 `snake`, 미등록 용어는 신규 사전 등록 필요 항목으로 표시
+- `skills/mcp-variable-naming/SKILL.md`: Gemini/Antigravity 세션에서 우선 참고할 변수명 생성 스킬입니다.
+- `AGENTS.md`: 이 저장소에서 작업하는 에이전트가 따라야 할 프로젝트 전반 규칙입니다.
+- `AGENTS_INIT.md`: Gemini/Antigravity에서 새 세션을 시작할 때 붙여 넣기 좋은 초기 규칙입니다.
+
+기본 규칙:
+
+- 한글 업무 용어 기반 이름은 임의 번역, 웹 검색, 모델 추측으로 만들지 않고 `convert_terms` 결과를 사용합니다.
+- 코드 식별자, DTO 필드, API payload key는 기본적으로 `outputCase: "lowerCamel"`을 사용합니다.
+- DB 컬럼, SQL alias, 물리명은 기본적으로 `outputCase: "snake"`를 사용합니다.
+- `confidence: "exact"`는 그대로 사용하고, `confidence: "composed"`는 `warnings`를 확인한 뒤 사용합니다.
+- `confidence: "partial"` 또는 `confidence: "none"`은 확정 이름으로 사용하지 않고 사용자에게 사전 등록 또는 도메인 확인이 필요하다고 알립니다.
+- 없는 단어, 도메인, 전체 용어는 코드나 문서에 `TODO(mcp-variable)` 주석을 남겨 사용자가 사전에 추가할 수 있게 합니다.
+
+미등록 용어 주석 예시:
+
+```ts
+// TODO(mcp-variable): "아라"는 사전에 등록되지 않은 용어입니다. confidence=none.
+// 사용자가 단어/도메인을 사전에 추가한 뒤 convert_terms를 다시 실행해 표준 변수명을 확정해야 합니다.
+const temporaryValue = value;
+```
+
+도메인 확인 필요 주석 예시:
+
+```ts
+// TODO(mcp-variable): "처리상태구분"의 도메인 "구분" 매핑을 확인할 수 없습니다. confidence=partial.
+// 사용자가 한글 도메인명과 물리 토큰을 사전에 추가/확인한 뒤 convert_terms를 다시 실행해야 합니다.
+const temporaryProcessingStatusValue = value;
+```
 
 예시 프롬프트:
 
 ```text
-Use $mcp-variable-naming to generate DTO field names for 등록일자, 라우팅결과값.
+Follow skills/mcp-variable-naming/SKILL.md and use the mcp-variable MCP convert_terms tool to generate DTO field names for 등록일자, 라우팅결과값.
+```
+
+```text
+Follow AGENTS_INIT.md. When a term, word, or domain is missing, leave TODO(mcp-variable) comments for dictionary registration.
 ```
 
 ## 공공표준용어 CSV 재변환

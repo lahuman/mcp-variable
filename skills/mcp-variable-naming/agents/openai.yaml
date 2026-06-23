@@ -1,7 +1,7 @@
 interface:
-  display_name: "MCP Variable Naming"
-  short_description: "Use mcp-variable for standard variable names"
-  default_prompt: "Use $mcp-variable-naming to generate standard variable names with the mcp-variable MCP dictionary."
+  display_name: "Gemini MCP Variable Naming"
+  short_description: "Use mcp-variable in Gemini/Antigravity for standard names"
+  default_prompt: "Use $mcp-variable-naming in Gemini/Antigravity: follow AGENTS_INIT.md and call convert_terms before generating standard variable names."
 
 dependencies:
   tools:

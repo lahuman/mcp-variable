@@ -1,13 +1,15 @@
 ---
 name: mcp-variable-naming
-description: Use the local mcp-variable MCP dictionary to generate, validate, or convert standard variable names, property names, DTO fields, API payload keys, SQL aliases, and database column names while writing or refactoring code. Use whenever a programming task needs names derived from Korean business terms, physical names, snake_case names, lowerCamel/UpperCamel names, or domain dictionary terminology.
+description: Use when Gemini, Antigravity, or another AI coding agent must generate, validate, or convert standard variable names, properties, DTO fields, API payload keys, SQL aliases, database columns, physical names, snake_case names, lowerCamel/UpperCamel names, or names derived from Korean domain dictionary terms.
 ---
 
-# MCP Variable Naming
+# MCP Variable Naming for Gemini
 
 ## Purpose
 
-Use the `mcp-variable` MCP server as the source of truth for business variable names. Do not invent names from memory, web search, or generic translation when a name is based on a domain term.
+In Gemini/Antigravity coding sessions, use the `mcp-variable` MCP server as the source of truth for business variable names. Do not invent names from memory, web search, or generic translation when a name is based on a domain term.
+
+If the agent session does not automatically load repository instructions, paste or attach `AGENTS_INIT.md` before asking for variable names.
 
 ## Required Workflow
 
@@ -65,6 +67,22 @@ For validating an existing physical or camel name:
 - `partial`: Do not finalize the name without user confirmation. Show `candidates`, `unmatched`, and the proposed fallback if one is needed to keep code compiling.
 - `none`: Treat the term as missing from the dictionary. Do not invent a standard variable name. Ask for the intended term or note that a new dictionary registration is needed.
 
+## User-Facing TODO Comments
+
+Keep this skill in English for agent clarity, but write comments that remain in user code or user-facing documents in Korean.
+
+```ts
+// TODO(mcp-variable): "아라"는 사전에 등록되지 않은 용어입니다. confidence=none.
+// 사용자가 단어/도메인을 사전에 추가한 뒤 convert_terms를 다시 실행해 표준 변수명을 확정해야 합니다.
+const temporaryValue = value;
+```
+
+```ts
+// TODO(mcp-variable): "처리상태구분"의 도메인 "구분" 매핑을 확인할 수 없습니다. confidence=partial.
+// 사용자가 한글 도메인명과 물리 토큰을 사전에 추가/확인한 뒤 convert_terms를 다시 실행해야 합니다.
+const temporaryProcessingStatusValue = value;
+```
+
 ## Practical Coding Pattern
 
 Before editing code, make a short mapping table in your working notes:
@@ -83,5 +101,6 @@ Then apply only the resolved names in code. If unresolved names block the implem
 If the `mcp-variable` MCP server or `convert_terms` tool is not available:
 
 1. Check the project instructions in `AGENTS.md` for the configured server command.
-2. Tell the user that standard naming cannot be verified until the MCP server is enabled.
-3. Do not replace MCP lookup with web search or generic translation.
+2. In Gemini/Antigravity, verify that the `mcp-variable` MCP server is enabled in the client MCP configuration.
+3. Tell the user that standard naming cannot be verified until the MCP server is enabled.
+4. Do not replace MCP lookup with web search or generic translation.

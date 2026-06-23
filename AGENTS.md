@@ -65,6 +65,8 @@ When writing or refactoring application code, do not invent business variable na
 
 Use `skills/mcp-variable-naming/SKILL.md` whenever a task involves names derived from Korean business terms, physical names, DTO fields, API payload keys, SQL aliases, database columns, or domain dictionary terminology.
 
+For Gemini/Antigravity sessions, apply `AGENTS_INIT.md` at session startup when repository instructions are not automatically loaded.
+
 Required behavior:
 
 1. Collect the Korean business terms that will become code or database identifiers.
@@ -119,6 +121,7 @@ If the MCP server or `convert_terms` tool is unavailable, tell the user that sta
 - `src/physical.ts`: physical name normalization and camel/snake formatting
 - `scripts/convert-public-standard-terms.ts`: public standard CSV converter
 - `tests/term-converter.test.ts`: unit and MCP handler tests
+- `AGENTS_INIT.md`: Gemini/Antigravity startup rules for MCP-based naming
 - `skills/mcp-variable-naming/SKILL.md`: reusable naming skill
 - `docs/mcp-variable-presentation.html`: single-file presentation
 
