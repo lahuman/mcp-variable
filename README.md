@@ -133,6 +133,21 @@ npm run typecheck
 npm run build
 ```
 
+## Codex 스킬
+
+프로그램 작성 중 변수명, DTO 필드명, API payload key, SQL alias 등을 만들 때
+`mcp-variable` 사전을 먼저 사용하도록 안내하는 스킬을 제공합니다.
+
+- 스킬 파일: `skills/mcp-variable-naming/SKILL.md`
+- 사용 목적: 한글 업무 용어 기반 변수명을 임의 번역하지 않고 `convert_terms` 결과로 생성
+- 기본 정책: 코드 식별자는 `lowerCamel`, DB/물리명은 `snake`, 미등록 용어는 신규 사전 등록 필요 항목으로 표시
+
+예시 프롬프트:
+
+```text
+Use $mcp-variable-naming to generate DTO field names for 등록일자, 라우팅결과값.
+```
+
 ## 공공표준용어 CSV 재변환
 
 행정안전부 공공데이터 공통표준용어 원본 CSV를 다시 반영할 때는 다음 명령을 사용합니다.

@@ -1,0 +1,10 @@
+interface:
+  display_name: "MCP Variable Naming"
+  short_description: "Use mcp-variable for standard variable names"
+  default_prompt: "Use $mcp-variable-naming to generate standard variable names with the mcp-variable MCP dictionary."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "mcp-variable"
+      description: "Local MCP server that exposes convert_terms for Korean term, physical name, and variable name conversion."

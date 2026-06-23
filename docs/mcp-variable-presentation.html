@@ -840,8 +840,106 @@ vrActno</pre>
 
     <section class="slide" id="slide-10" aria-labelledby="title-10">
       <div class="slide-inner">
+        <p class="eyebrow">Codex skill</p>
+        <h2 id="title-10">스킬로 “변수명은 MCP로 만든다”를 습관화합니다</h2>
+        <p class="lead">
+          <code>skills/mcp-variable-naming/SKILL.md</code>는 프로그램 작성 중 변수명, DTO 필드명,
+          API payload key, SQL alias, DB 컬럼명을 만들 때 <code>mcp-variable</code>을 먼저 호출하도록 안내하는 Codex 스킬입니다.
+        </p>
+        <div class="three-col">
+          <article class="card blue">
+            <h3>언제 사용하나요?</h3>
+            <p>한글 업무 용어를 코드 식별자나 물리명으로 바꾸는 모든 작업에서 사용합니다.</p>
+          </article>
+          <article class="card green">
+            <h3>무엇을 막나요?</h3>
+            <p>AI가 일반 번역, 웹 검색, 기억에 의존해 표준과 다른 변수명을 만드는 일을 줄입니다.</p>
+          </article>
+          <article class="card amber">
+            <h3>무엇을 남기나요?</h3>
+            <p>미등록 용어, 부분 매칭, 후보 정보를 남겨 신규 사전 등록 여부를 판단하게 합니다.</p>
+          </article>
+        </div>
+        <div class="callout">
+          핵심 원칙: <strong>업무 용어 기반 이름은 추측하지 않고, <code>convert_terms</code> 결과를 기준으로 확정합니다.</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" id="slide-11" aria-labelledby="title-11">
+      <div class="slide-inner">
+        <p class="eyebrow">Skill usage</p>
+        <h2 id="title-11">스킬 사용법: 요청, 변환, 판단, 적용</h2>
+        <p class="lead">
+          스킬은 이름을 만들기 전에 업무 용어를 모으고, MCP에 줄 단위로 질의한 뒤,
+          신뢰도에 따라 코드에 적용할지 보류할지 결정하게 합니다.
+        </p>
+        <div class="pipeline" aria-label="스킬 사용 흐름">
+          <article class="pipeline-step" data-step="1">
+            <h3>용어 수집</h3>
+            <p>변수, DTO 필드, API key, SQL alias가 될 한글 업무 용어를 먼저 정리합니다.</p>
+          </article>
+          <article class="pipeline-step" data-step="2">
+            <h3>MCP 호출</h3>
+            <p><code>convert_terms</code>에 여러 줄 입력과 <code>outputCase</code>를 전달합니다.</p>
+          </article>
+          <article class="pipeline-step" data-step="3">
+            <h3>신뢰도 확인</h3>
+            <p><code>exact</code>, <code>composed</code>, <code>partial</code>, <code>none</code>을 확인합니다.</p>
+          </article>
+          <article class="pipeline-step" data-step="4">
+            <h3>코드 적용</h3>
+            <p>확정 가능한 이름만 코드에 반영하고, 미등록 용어는 사용자에게 알립니다.</p>
+          </article>
+        </div>
+        <div class="two-col">
+          <article class="card">
+            <span class="diagram-label">추천 프롬프트</span>
+            <pre class="code-block">Use $mcp-variable-naming to generate DTO field names
+for 등록일자, 라우팅결과값, 아라.</pre>
+          </article>
+          <article class="card green">
+            <span class="diagram-label">스킬이 유도하는 MCP 요청</span>
+            <pre class="code-block">{
+  "text": "등록일자\n라우팅결과값\n아라",
+  "direction": "term_to_physical",
+  "outputCase": "lowerCamel"
+}</pre>
+          </article>
+        </div>
+        <table class="compare" aria-label="스킬 결과 판단 기준">
+          <thead>
+            <tr>
+              <th>confidence</th>
+              <th>판단</th>
+              <th>코드 적용 방식</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>exact</code></td>
+              <td>사전에 정확히 등록된 용어입니다.</td>
+              <td><code>convertedText</code>를 그대로 사용합니다.</td>
+            </tr>
+            <tr>
+              <td><code>composed</code></td>
+              <td>검증된 단어와 도메인 조합입니다.</td>
+              <td>경고가 없으면 사용하고, 경고가 있으면 공유합니다.</td>
+            </tr>
+            <tr>
+              <td><code>partial</code> / <code>none</code></td>
+              <td>불확실하거나 사전에 없습니다.</td>
+              <td>임의 생성하지 않고 후보, 미매칭, 신규 등록 필요를 알립니다.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="slide" id="slide-12" aria-labelledby="title-12">
+      <div class="slide-inner">
         <p class="eyebrow">Closing</p>
-        <h2 id="title-10">AI가 웹을 찾는 대신 사내 사전을 호출하게 만든다</h2>
+        <h2 id="title-12">AI가 웹을 찾는 대신 사내 사전을 호출하게 만든다</h2>
         <p class="lead">
           MCP는 AI와 사내 시스템 사이의 표준 연결 방식이고,
           mcp-variable은 그 연결을 도메인 사전과 변수명 생성 업무에 적용한 예입니다.
@@ -853,6 +951,7 @@ vrActno</pre>
           <li>참고: <a href="https://modelcontextprotocol.io/docs/getting-started/intro">Model Context Protocol 소개</a></li>
           <li>참고: <a href="https://modelcontextprotocol.io/docs/learn/architecture">Model Context Protocol 아키텍처</a></li>
           <li>프로젝트 도구: <code>convert_terms</code> from <code>mcp-variable</code></li>
+          <li>Codex 스킬: <code>skills/mcp-variable-naming/SKILL.md</code></li>
         </ul>
       </div>
     </section>
@@ -869,7 +968,9 @@ vrActno</pre>
     <button class="dot" type="button" aria-label="8번 슬라이드로 이동" data-target="slide-8"></button>
     <button class="dot" type="button" aria-label="9번 슬라이드로 이동" data-target="slide-9"></button>
     <button class="dot" type="button" aria-label="10번 슬라이드로 이동" data-target="slide-10"></button>
-    <span class="slide-count" aria-live="polite">1 / 10</span>
+    <button class="dot" type="button" aria-label="11번 슬라이드로 이동" data-target="slide-11"></button>
+    <button class="dot" type="button" aria-label="12번 슬라이드로 이동" data-target="slide-12"></button>
+    <span class="slide-count" aria-live="polite">1 / 12</span>
   </nav>
 
   <script>

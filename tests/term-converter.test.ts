@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 
 import { describe, expect, test } from "vitest";
 
-import { loadCsvFile } from "../src/csvLoader.js";
+import { CsvLoadError, loadCsvFile, parseCsvText } from "../src/csvLoader.js";
 import { buildDictionary } from "../src/dictionary.js";
 import { createConvertTermsHandler } from "../src/mcpTool.js";
 import { convertTerms } from "../src/matcher.js";
@@ -82,6 +82,36 @@ describe("CSV loading", () => {
         finalModifiedAt: "2023-12-01 15:34:44"
       })
     ]);
+  });
+
+  test("parses a large CSV text through the parser without file I/O", () => {
+    const largeRows = Array.from({ length: 75_000 }, (_, index) => {
+      const sequence = String(index + 1).padStart(5, "0");
+      return `대용량테스트${sequence},BULK_TEST_${sequence},명,명V100,VARCHAR(100),,,대용량테스트,System,2026-06-23 00:00:00`;
+    });
+
+    const loaded = parseCsvText(csv(largeRows));
+
+    expect(loaded).toHaveLength(75_000);
+    expect(loaded[0]).toMatchObject({
+      termName: "대용량테스트00001",
+      physicalName: "BULK_TEST_00001"
+    });
+    expect(loaded.at(-1)).toMatchObject({
+      termName: "대용량테스트75000",
+      physicalName: "BULK_TEST_75000"
+    });
+  });
+
+  test("parser-only malformed CSV errors include parser details", () => {
+    const malformed = csv([
+      "정상용어,NORMAL_NM,명,명V100,VARCHAR(100),,,테스트,System,2026-06-23 00:00:00",
+      '깨진용어,BROKEN_NM,명,명V100,VARCHAR(100),,,"닫히지 않은 정의,테스트,System,2026-06-23 00:00:00'
+    ]);
+
+    expect(() => parseCsvText(malformed)).toThrow(CsvLoadError);
+    expect(() => parseCsvText(malformed)).toThrow(/Failed to parse CSV text/);
+    expect(() => parseCsvText(malformed)).toThrow(/Quote Not Closed|Invalid Closing Quote|CSV/);
   });
 });
 

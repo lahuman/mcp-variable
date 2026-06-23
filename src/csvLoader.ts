@@ -38,21 +38,33 @@ export async function loadCsvFile(filePath: string): Promise<TermRow[]> {
     const cp949 = iconv.decode(buffer, "cp949");
     try {
       return parseCsvText(cp949);
-    } catch {
-      throw new CsvLoadError(`Failed to parse CSV file: ${filePath}`, {
-        cause: utf8Error
-      });
+    } catch (cp949Error) {
+      throw new CsvLoadError(
+        `Failed to parse CSV file: ${filePath}. UTF-8 error: ${formatError(
+          utf8Error
+        )}; CP949 error: ${formatError(cp949Error)}`,
+        {
+          cause: cp949Error
+        }
+      );
     }
   }
 }
 
-function parseCsvText(text: string): TermRow[] {
-  const records = parse(text.replace(/^\uFEFF/, ""), {
-    bom: true,
-    columns: (headers: string[]) => headers.map((header) => header.trim()),
-    skip_empty_lines: true,
-    trim: true
-  }) as Array<Record<string, string | undefined>>;
+export function parseCsvText(text: string): TermRow[] {
+  let records: Array<Record<string, string | undefined>>;
+  try {
+    records = parse(text.replace(/^\uFEFF/, ""), {
+      bom: true,
+      columns: (headers: string[]) => headers.map((header) => header.trim()),
+      skip_empty_lines: true,
+      trim: true
+    }) as Array<Record<string, string | undefined>>;
+  } catch (error) {
+    throw new CsvLoadError(`Failed to parse CSV text. ${formatError(error)}`, {
+      cause: error
+    });
+  }
 
   if (records.length === 0) {
     return [];
@@ -65,6 +77,15 @@ function parseCsvText(text: string): TermRow[] {
   }
 
   return records.map((record, index) => normalizeRecord(record, index + 2));
+}
+
+function formatError(error: unknown): string {
+  if (error instanceof Error) {
+    const code = "code" in error && typeof error.code === "string" ? ` [${error.code}]` : "";
+    return `${error.message}${code}`;
+  }
+
+  return String(error);
 }
 
 function normalizeRecord(record: Record<string, string | undefined>, lineNumber: number): TermRow {
