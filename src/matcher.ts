@@ -7,12 +7,22 @@ import type {
   ConvertTermsOutput,
   ConvertTermsSummary,
   ResolvedDirection,
+  ReverseCheck,
   TermComponent,
   TermDictionary,
   TermMatch
 } from "./types.js";
 
 const DEFAULT_MAX_CANDIDATES = 5;
+
+type PhysicalTokenComposition = {
+  convertedText: string;
+  confidence: Confidence;
+  components: TermComponent[];
+  candidates: ConversionCandidate[];
+  unmatched: string[];
+  warnings: string[];
+};
 
 export function convertTerms(dictionary: TermDictionary, input: ConvertTermsInput): ConvertTermsOutput {
   const maxCandidates = normalizeMaxCandidates(input.maxCandidates);
@@ -60,10 +70,13 @@ function convertBulkTerms(
     warnings.unshift("Bulk input resolved to mixed conversion directions; inspect items for per-line directions.");
   }
 
+  const annotatedText = buildBulkAnnotatedText(items);
+
   return {
     direction,
     input: text,
     convertedText: items.map((item) => item.convertedText).join("\n"),
+    ...(annotatedText ? { annotatedText } : {}),
     confidence: summarizeConfidence(summary),
     matches: items.flatMap((item) => item.matches),
     candidates: items.flatMap((item) => item.candidates).slice(0, maxCandidates),
@@ -72,6 +85,14 @@ function convertBulkTerms(
     items,
     summary
   };
+}
+
+function buildBulkAnnotatedText(items: ConvertTermsOutput[]): string | undefined {
+  if (!items.some((item) => item.annotatedText)) {
+    return undefined;
+  }
+
+  return items.map((item) => item.annotatedText ?? item.convertedText).join("\n");
 }
 
 function splitBulkLines(text: string): string[] {
@@ -139,31 +160,35 @@ function convertTermToPhysical(
   const exact = dictionary.attributeByTerm.get(text);
   if (exact) {
     const target = formatPhysicalName(exact.physical, input.outputCase);
-    return {
-      direction: "term_to_physical",
-      input: text,
-      convertedText: target,
-      confidence: "exact",
-      matches: [
-        {
-          source: text,
-          target,
-          type: "attribute",
-          components: exact.components
-        }
-      ],
-      candidates: [],
-      unmatched: [],
-      warnings: []
-    };
+    return withReverseCheck(
+      dictionary,
+      {
+        direction: "term_to_physical",
+        input: text,
+        convertedText: target,
+        confidence: "exact",
+        matches: [
+          {
+            source: text,
+            target,
+            type: "attribute",
+            components: exact.components
+          }
+        ],
+        candidates: [],
+        unmatched: [],
+        warnings: []
+      },
+      maxCandidates
+    );
   }
 
   const composed = composeTermToPhysical(dictionary, text, input, maxCandidates);
   if (composed) {
-    return composed;
+    return withReverseCheck(dictionary, composed, maxCandidates);
   }
 
-  return scanKoreanText(dictionary, text, input, maxCandidates);
+  return withReverseCheck(dictionary, scanKoreanText(dictionary, text, input, maxCandidates), maxCandidates);
 }
 
 function convertPhysicalToTerm(
@@ -193,7 +218,102 @@ function convertPhysicalToTerm(
     };
   }
 
-  const tokens = splitPhysicalName(normalized);
+  const composed = composePhysicalTokensToTerm(dictionary, normalized, maxCandidates);
+
+  if (composed.confidence === "composed") {
+    return {
+      direction: "physical_to_term",
+      input: text,
+      convertedText: composed.convertedText,
+      confidence: "composed",
+      matches: [
+        {
+          source: text,
+          target: composed.convertedText,
+          type: "attribute",
+          components: composed.components
+        }
+      ],
+      candidates: composed.candidates,
+      unmatched: composed.unmatched,
+      warnings: composed.warnings
+    };
+  }
+
+  return {
+    direction: "physical_to_term",
+    input: text,
+    convertedText: composed.convertedText || text,
+    confidence: composed.confidence,
+    matches:
+      composed.components.length > 0
+        ? [
+            {
+              source: text,
+              target: composed.convertedText,
+              type: "attribute",
+              components: composed.components
+            }
+          ]
+        : [],
+    candidates: composed.candidates,
+    unmatched: composed.unmatched,
+    warnings: composed.warnings
+  };
+}
+
+function withReverseCheck(
+  dictionary: TermDictionary,
+  result: ConvertTermsOutput,
+  maxCandidates: number
+): ConvertTermsOutput {
+  const reverseCheck = buildReverseCheck(dictionary, result.input, result.convertedText, maxCandidates);
+  if (!reverseCheck) {
+    return result;
+  }
+
+  return {
+    ...result,
+    annotatedText: reverseCheck.annotatedText,
+    reverseCheck
+  };
+}
+
+function buildReverseCheck(
+  dictionary: TermDictionary,
+  sourceTerm: string,
+  convertedText: string,
+  maxCandidates: number
+): ReverseCheck | undefined {
+  if (containsHangul(convertedText)) {
+    return undefined;
+  }
+
+  const physical = camelToSnakePhysical(convertedText);
+  const composed = composePhysicalTokensToTerm(dictionary, physical, maxCandidates);
+  if (composed.confidence !== "composed" || composed.convertedText === sourceTerm) {
+    return undefined;
+  }
+
+  return {
+    sourceTerm,
+    physical,
+    suggestedTerm: composed.convertedText,
+    annotatedText: composed.convertedText,
+    confidence: composed.confidence,
+    components: composed.components,
+    candidates: composed.candidates,
+    unmatched: composed.unmatched,
+    warnings: composed.warnings
+  };
+}
+
+function composePhysicalTokensToTerm(
+  dictionary: TermDictionary,
+  text: string,
+  maxCandidates: number
+): PhysicalTokenComposition {
+  const tokens = splitPhysicalName(text);
   const candidates: ConversionCandidate[] = [];
   const warnings: string[] = [];
   const unmatched: string[] = [];
@@ -231,44 +351,18 @@ function convertPhysicalToTerm(
     });
   });
 
-  if (components.length === tokens.length && tokens.length > 0) {
-    const convertedText = components.map((component) => component.term).join("");
-    return {
-      direction: "physical_to_term",
-      input: text,
-      convertedText,
-      confidence: "composed",
-      matches: [
-        {
-          source: text,
-          target: convertedText,
-          type: "attribute",
-          components
-        }
-      ],
-      candidates: candidates.slice(0, maxCandidates),
-      unmatched,
-      warnings
-    };
+  const convertedText = components.map((component) => component.term).join("");
+  let confidence: Confidence = "none";
+  if (tokens.length > 0 && components.length === tokens.length) {
+    confidence = "composed";
+  } else if (components.length > 0) {
+    confidence = "partial";
   }
 
-  const convertedText = components.length > 0 ? components.map((component) => component.term).join("") : text;
   return {
-    direction: "physical_to_term",
-    input: text,
     convertedText,
-    confidence: components.length > 0 ? "partial" : "none",
-    matches:
-      components.length > 0
-        ? [
-            {
-              source: text,
-              target: convertedText,
-              type: "attribute",
-              components
-            }
-          ]
-        : [],
+    confidence,
+    components,
     candidates: candidates.slice(0, maxCandidates),
     unmatched,
     warnings

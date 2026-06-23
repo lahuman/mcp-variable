@@ -51,11 +51,13 @@ Input:
 Important output fields:
 
 - `convertedText`: converted result
+- `annotatedText`: reverse-confirmed Korean term when a clearer Korean term is suggested
 - `confidence`: `exact`, `composed`, `partial`, or `none`
 - `matches`: exact or composed matches
 - `candidates`: ambiguous alternatives or possible mappings
 - `unmatched`: terms or tokens not found in the dictionary
 - `warnings`: ambiguity or diagnostic messages
+- `reverseCheck`: token-level reverse lookup details for suggested Korean term changes
 - `items`: per-line results for bulk conversion
 - `summary`: bulk counts
 
@@ -75,8 +77,9 @@ Required behavior:
 4. Use `outputCase: "lowerCamel"` for code identifiers by default.
 5. Use `outputCase: "snake"` for DB columns, SQL aliases, and physical names.
 6. Check `confidence`, `unmatched`, `warnings`, and `candidates` before applying names.
-7. Do not silently use a guessed name when confidence is `partial` or `none`.
-8. Report unresolved terms in the final response.
+7. If `reverseCheck` is present, report its `suggestedTerm` or `annotatedText` to show the reverse-confirmed Korean term.
+8. Do not silently use a guessed name when confidence is `partial` or `none`.
+9. Report unresolved terms in the final response.
 
 Example for DTO fields:
 
@@ -123,6 +126,7 @@ If the MCP server or `convert_terms` tool is unavailable, tell the user that sta
 - `tests/term-converter.test.ts`: unit and MCP handler tests
 - `AGENTS_INIT.md`: Gemini/Antigravity startup rules for MCP-based naming
 - `skills/mcp-variable-naming/SKILL.md`: reusable naming skill
+- `docs/reverse-check.md`: reverse-check feature behavior, output contract, work history, and verification notes
 - `docs/mcp-variable-presentation.html`: single-file presentation
 
 ## Commands

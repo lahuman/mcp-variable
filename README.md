@@ -22,6 +22,7 @@ CSV 사전을 기반으로 한글 용어명과 물리명을 변환하는 Node.js
 - 한글 용어명 -> 물리명 변환
 - 물리명 snake case 또는 물리명 기반 camel case -> 한글 용어명 변환
 - 여러 줄 입력을 줄 단위로 일괄 변환하고 `items`, `summary` 반환
+- 한글 -> 물리명 변환 결과를 토큰 단위로 다시 확인해 더 표준적인 한글명이 있으면 `reverseCheck`, `annotatedText`로 제안
 - CSV 수정 시 다음 요청에서 자동 재로딩
 - 검증된 단어/도메인 매핑으로만 신규 용어 조합
 - 애매한 매핑은 확정하지 않고 `candidates`, `warnings`, `unmatched`로 반환
@@ -125,6 +126,20 @@ CSV 경로 우선순위:
 }
 ```
 
+한글 -> 물리명 또는 camel 표기 변환에서 결과 물리 토큰을 다시 한글로 조합했을 때 입력과 다른 표준 한글명이 확인되면, `convertedText`는 식별자만 유지하고 `reverseCheck`와 `annotatedText`를 함께 반환합니다.
+
+```json
+{
+  "convertedText": "appInfoNm",
+  "annotatedText": "애플리케이션정보명",
+  "reverseCheck": {
+    "physical": "APP_INFO_NM",
+    "suggestedTerm": "애플리케이션정보명",
+    "confidence": "composed"
+  }
+}
+```
+
 ## 개발
 
 ```bash
@@ -132,6 +147,10 @@ npm test
 npm run typecheck
 npm run build
 ```
+
+## 추가 문서
+
+- `docs/reverse-check.md`: 한글 -> 물리명 변환 결과를 다시 한글명으로 확인하는 reverse check 기능의 목적, 출력 계약, 구현 내역, 검증 방법을 정리합니다.
 
 ## 스킬과 에이전트 지침
 

@@ -19,10 +19,23 @@ const componentSchema = z.object({
   role: z.enum(["word", "domain"])
 });
 
+const reverseCheckSchema = z.object({
+  sourceTerm: z.string(),
+  physical: z.string(),
+  suggestedTerm: z.string(),
+  annotatedText: z.string(),
+  confidence: z.enum(["exact", "composed", "partial", "none"]),
+  components: z.array(componentSchema),
+  candidates: z.array(z.unknown()),
+  unmatched: z.array(z.string()),
+  warnings: z.array(z.string())
+});
+
 const convertTermsItemOutputSchema = z.object({
   direction: z.enum(["term_to_physical", "physical_to_term"]),
   input: z.string(),
   convertedText: z.string(),
+  annotatedText: z.string().optional(),
   confidence: z.enum(["exact", "composed", "partial", "none"]),
   matches: z.array(
     z.object({
@@ -34,7 +47,8 @@ const convertTermsItemOutputSchema = z.object({
   ),
   candidates: z.array(z.unknown()),
   unmatched: z.array(z.string()),
-  warnings: z.array(z.string())
+  warnings: z.array(z.string()),
+  reverseCheck: reverseCheckSchema.optional()
 });
 
 const convertTermsSummarySchema = z.object({

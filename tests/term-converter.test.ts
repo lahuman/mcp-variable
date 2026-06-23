@@ -255,6 +255,54 @@ describe("term conversion", () => {
     ).toBe("RotngRsltVal");
   });
 
+  test("suggests reverse-checked Korean term when physical tokens map to a more standard term", () => {
+    const dictionary = buildDictionary([
+      {
+        termName: "애플리케이션명",
+        physicalName: "APP_NM",
+        domainType: "명",
+        domain: "명V100",
+        dataType: "VARCHAR(100)"
+      },
+      {
+        termName: "정보명",
+        physicalName: "INFO_NM",
+        domainType: "명",
+        domain: "명V100",
+        dataType: "VARCHAR(100)"
+      },
+      {
+        termName: "앱정보명",
+        physicalName: "APP_INFO_NM",
+        domainType: "명",
+        domain: "명V100",
+        dataType: "VARCHAR(100)"
+      }
+    ]);
+
+    const result = convertTerms(dictionary, {
+      text: "앱정보명",
+      direction: "term_to_physical",
+      outputCase: "lowerCamel"
+    });
+
+    expect(result).toMatchObject({
+      convertedText: "appInfoNm",
+      annotatedText: "애플리케이션정보명",
+      reverseCheck: {
+        physical: "APP_INFO_NM",
+        suggestedTerm: "애플리케이션정보명",
+        annotatedText: "애플리케이션정보명",
+        confidence: "composed",
+        components: [
+          { term: "애플리케이션", physical: "APP", role: "word" },
+          { term: "정보", physical: "INFO", role: "word" },
+          { term: "명", physical: "NM", role: "domain" }
+        ]
+      }
+    });
+  });
+
   test("converts newline-separated terms in bulk with per-line items", () => {
     const result = convertTerms(buildDictionary(rows), {
       text: "등록일자\n라우팅결과값",

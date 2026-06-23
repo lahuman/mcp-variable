@@ -67,6 +67,8 @@ For validating an existing physical or camel name:
 - `partial`: Do not finalize the name without user confirmation. Show `candidates`, `unmatched`, and the proposed fallback if one is needed to keep code compiling.
 - `none`: Treat the term as missing from the dictionary. Do not invent a standard variable name. Ask for the intended term or note that a new dictionary registration is needed.
 
+If `reverseCheck` is present on a `term_to_physical` result, the identifier in `convertedText` is still the machine-usable name, but the Korean term in `reverseCheck.suggestedTerm` should be reported to the user. `annotatedText` contains that reverse-confirmed Korean term directly, for example `애플리케이션정보명`.
+
 ## User-Facing TODO Comments
 
 Keep this skill in English for agent clarity, but write comments that remain in user code or user-facing documents in Korean.

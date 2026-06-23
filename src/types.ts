@@ -72,15 +72,29 @@ export interface ConvertTermsSummary {
   none: number;
 }
 
+export interface ReverseCheck {
+  sourceTerm: string;
+  physical: string;
+  suggestedTerm: string;
+  annotatedText: string;
+  confidence: Confidence;
+  components: TermComponent[];
+  candidates: ConversionCandidate[];
+  unmatched: string[];
+  warnings: string[];
+}
+
 export interface ConvertTermsOutput {
   direction: ResolvedDirection;
   input: string;
   convertedText: string;
+  annotatedText?: string;
   confidence: Confidence;
   matches: TermMatch[];
   candidates: ConversionCandidate[];
   unmatched: string[];
   warnings: string[];
+  reverseCheck?: ReverseCheck;
   items?: ConvertTermsOutput[];
   summary?: ConvertTermsSummary;
 }

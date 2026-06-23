@@ -47,6 +47,7 @@ For database columns, SQL aliases, and physical names, use `snake`:
 - If `confidence` is `"composed"`, check `warnings` first. Use `convertedText` only when there is no blocking warning.
 - If `confidence` is `"partial"`, do not finalize the name. Report `candidates`, `unmatched`, and `warnings` to the user.
 - If `confidence` is `"none"`, treat the term as missing from the dictionary. Do not invent a replacement name.
+- If `reverseCheck` is present, tell the user about its `suggestedTerm` or show `annotatedText`, such as `애플리케이션정보명`.
 
 ## Comment Rule for Missing Words or Domains
 
