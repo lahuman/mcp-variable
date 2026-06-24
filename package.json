@@ -12,7 +12,8 @@
     "dev": "tsx src/server.ts",
     "start": "node dist/server.js",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check:presentation": "node scripts/check-beginner-presentation.mjs"
   },
   "engines": {
     "node": ">=20"
