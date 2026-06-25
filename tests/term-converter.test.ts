@@ -235,6 +235,30 @@ describe("term conversion", () => {
     expect(result.warnings.some((warning) => warning.includes("Ambiguous"))).toBe(true);
   });
 
+  test("keeps unmatched Korean groups separated by matched terms", () => {
+    const dictionary = buildDictionary([
+      {
+        termName: "계정정보",
+        physicalName: "ACNT_INFO",
+        domainType: "정보",
+        domain: "정보V100",
+        dataType: "VARCHAR(100)"
+      }
+    ]);
+
+    const result = convertTerms(dictionary, {
+      text: "주요계정정보명",
+      direction: "term_to_physical",
+      outputCase: "snake"
+    });
+
+    expect(result).toMatchObject({
+      convertedText: "주요ACNT_INFO명",
+      confidence: "partial",
+      unmatched: ["주요", "명"]
+    });
+  });
+
   test("applies lowerCamel and UpperCamel output cases", () => {
     const dictionary = buildDictionary(rows);
 

@@ -492,9 +492,17 @@ function scanKoreanText(
     const lookup = lookups.find((candidate) => text.startsWith(candidate.source, index));
     if (!lookup) {
       const char = text[index]!;
+      const previousChunk = chunks.at(-1);
       chunks.push({ kind: "text", value: char });
       if (containsHangul(char)) {
-        unmatched.push(char);
+        const previousWasUnmatchedHangul =
+          previousChunk?.kind === "text" && containsHangul(previousChunk.value.at(-1) ?? "");
+        const lastUnmatched = unmatched.at(-1);
+        if (previousWasUnmatchedHangul && lastUnmatched) {
+          unmatched[unmatched.length - 1] = lastUnmatched + char;
+        } else {
+          unmatched.push(char);
+        }
       }
       index += char.length;
       continue;
@@ -531,7 +539,7 @@ function scanKoreanText(
     confidence: matches.length > 0 ? "partial" : "none",
     matches,
     candidates: candidates.slice(0, maxCandidates),
-    unmatched: compactUnmatched(unmatched),
+    unmatched,
     warnings
   };
 }
@@ -595,19 +603,6 @@ function appendMatchChunk(chunks: Array<{ kind: "text" | "match"; value: string 
 
 function isSnakePhysical(value: string): boolean {
   return /^[A-Z0-9_]+$/.test(value);
-}
-
-function compactUnmatched(chars: string[]): string[] {
-  const groups: string[] = [];
-  for (const char of chars) {
-    const last = groups.at(-1);
-    if (last && containsHangul(last.at(-1) ?? "")) {
-      groups[groups.length - 1] = last + char;
-    } else {
-      groups.push(char);
-    }
-  }
-  return groups;
 }
 
 function resolveDirection(text: string, direction: ConvertTermsInput["direction"]): ResolvedDirection {
