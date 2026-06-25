@@ -131,6 +131,64 @@ describe("dictionary building", () => {
     ]);
   });
 
+  test("separates suffix domains from row domain types", () => {
+    const dictionary = buildDictionary([
+      {
+        termName: "문서내용",
+        physicalName: "DOC_CN",
+        domainType: "내용",
+        domain: "내용V4000",
+        dataType: "VARCHAR(4000)"
+      },
+      {
+        termName: "문서제목",
+        physicalName: "DOC_TTL",
+        domainType: "명",
+        domain: "명V256",
+        dataType: "VARCHAR(256)"
+      },
+      {
+        termName: "영문명",
+        physicalName: "ENG_NM",
+        domainType: "명",
+        domain: "명V100",
+        dataType: "VARCHAR(100)"
+      },
+      {
+        termName: "영문성명",
+        physicalName: "ENG_FLNM",
+        domainType: "명",
+        domain: "명V100",
+        dataType: "VARCHAR(100)"
+      },
+      {
+        termName: "한자성명",
+        physicalName: "CHNCRT_FLNM",
+        domainType: "명",
+        domain: "명V100",
+        dataType: "VARCHAR(100)"
+      }
+    ]);
+
+    expect(dictionary.domainTermToPhysical.get("명")).toEqual(new Set(["NM"]));
+    expect(dictionary.domainTermToPhysical.get("제목")).toEqual(new Set(["TTL"]));
+    expect(dictionary.domainTermToPhysical.get("성명")).toEqual(new Set(["FLNM"]));
+    expect(dictionary.physicalToTerms.has("TTL")).toBe(false);
+    expect(dictionary.physicalToTerms.has("FLNM")).toBe(false);
+    expect(dictionary.attributeByTerm.get("문서제목")?.components).toEqual([
+      { term: "문서", physical: "DOC", role: "word" },
+      { term: "제목", physical: "TTL", role: "domain" }
+    ]);
+    expect(dictionary.attributeByTerm.get("영문성명")?.components).toEqual([
+      { term: "영문", physical: "ENG", role: "word" },
+      { term: "성명", physical: "FLNM", role: "domain" }
+    ]);
+    expect(dictionary.attributeByTerm.get("한자성명")?.components).toEqual([
+      { term: "한자", physical: "CHNCRT", role: "word" },
+      { term: "성명", physical: "FLNM", role: "domain" }
+    ]);
+  });
+
   test("does not invent word mappings from an unverified multi-token compound", () => {
     const dictionary = buildDictionary([
       {
@@ -204,6 +262,90 @@ describe("term conversion", () => {
       { term: "결과", physical: "RSLT", role: "word" },
       { term: "값", physical: "VAL", role: "domain" }
     ]);
+  });
+
+  test("composes suffix-domain terms without exact attributes", () => {
+    const dictionary = buildDictionary([
+      {
+        termName: "정비내용",
+        physicalName: "MTNC_CN",
+        domainType: "내용",
+        domain: "내용V4000",
+        dataType: "VARCHAR(4000)"
+      },
+      {
+        termName: "계정명",
+        physicalName: "ACNT_NM",
+        domainType: "명",
+        domain: "명V100",
+        dataType: "VARCHAR(100)"
+      },
+      {
+        termName: "정보내용",
+        physicalName: "INFO_CN",
+        domainType: "내용",
+        domain: "내용V4000",
+        dataType: "VARCHAR(4000)"
+      },
+      {
+        termName: "문서내용",
+        physicalName: "DOC_CN",
+        domainType: "내용",
+        domain: "내용V4000",
+        dataType: "VARCHAR(4000)"
+      },
+      {
+        termName: "문서제목",
+        physicalName: "DOC_TTL",
+        domainType: "명",
+        domain: "명V256",
+        dataType: "VARCHAR(256)"
+      },
+      {
+        termName: "영문명",
+        physicalName: "ENG_NM",
+        domainType: "명",
+        domain: "명V100",
+        dataType: "VARCHAR(100)"
+      },
+      {
+        termName: "영문성명",
+        physicalName: "ENG_FLNM",
+        domainType: "명",
+        domain: "명V100",
+        dataType: "VARCHAR(100)"
+      }
+    ]);
+
+    const composed = convertTerms(dictionary, {
+      text: "정비계정정보명",
+      direction: "term_to_physical",
+      outputCase: "snake"
+    });
+
+    expect(composed).toMatchObject({
+      convertedText: "MTNC_ACNT_INFO_NM",
+      confidence: "composed",
+      unmatched: []
+    });
+    expect(composed.matches[0]?.components).toEqual([
+      { term: "정비", physical: "MTNC", role: "word" },
+      { term: "계정", physical: "ACNT", role: "word" },
+      { term: "정보", physical: "INFO", role: "word" },
+      { term: "명", physical: "NM", role: "domain" }
+    ]);
+
+    expect(
+      convertTerms(dictionary, {
+        text: "정보명",
+        direction: "term_to_physical",
+        outputCase: "snake"
+      })
+    ).toMatchObject({
+      convertedText: "INFO_NM",
+      confidence: "composed",
+      unmatched: []
+    });
   });
 
   test("returns candidates and warnings instead of confirming ambiguous compounds", () => {
