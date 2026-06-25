@@ -4,6 +4,17 @@ export type OutputCase = "snake" | "lowerCamel" | "upperCamel";
 export type Confidence = "exact" | "composed" | "partial" | "none";
 export type ComponentRole = "word" | "domain";
 export type MatchType = "attribute" | "word" | "domain";
+export type SearchMatchMode = "contains" | "startsWith" | "exact";
+export type SearchMatchType = "contains" | "startsWith" | "exact";
+export type SearchableTermField =
+  | "termName"
+  | "physicalName"
+  | "domainType"
+  | "domain"
+  | "dataType"
+  | "codeName"
+  | "definition"
+  | "requestTask";
 
 export interface TermRow {
   termName: string;
@@ -97,4 +108,34 @@ export interface ConvertTermsOutput {
   reverseCheck?: ReverseCheck;
   items?: ConvertTermsOutput[];
   summary?: ConvertTermsSummary;
+}
+
+export interface SearchTermsInput {
+  query: string;
+  fields?: SearchableTermField[];
+  matchMode?: SearchMatchMode;
+  limit?: number;
+  offset?: number;
+}
+
+export interface SearchMatchedField {
+  field: SearchableTermField;
+  value: string;
+  matchType: SearchMatchType;
+}
+
+export interface SearchTermsItem extends TermRow {
+  score: number;
+  matchedFields: SearchMatchedField[];
+}
+
+export interface SearchTermsOutput {
+  query: string;
+  fields: SearchableTermField[];
+  matchMode: SearchMatchMode;
+  total: number;
+  limit: number;
+  offset: number;
+  items: SearchTermsItem[];
+  warnings: string[];
 }

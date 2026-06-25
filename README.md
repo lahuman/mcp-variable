@@ -11,6 +11,7 @@ CSV 사전을 기반으로 한글 용어명과 물리명을 변환하는 Node.js
 - **표준 사전 기반 변환**: 사내 또는 공공 표준 용어 사전을 CSV로 두고, AI가 해당 사전을 MCP tool로 조회합니다.
 - **한글/물리명/변수명 왕복 지원**: `등록일자` -> `REG_YMD`, `rotngRsltVal` -> `라우팅결과값`처럼 개발자가 실제로 쓰는 방향을 지원합니다.
 - **대량 변수명 생성**: 여러 줄의 한글 용어명을 한 번에 넣어 `lowerCamel` 변수명 목록으로 변환할 수 있습니다.
+- **등록 사전 검색**: `정비점`, `자동차`, `VHCL`처럼 키워드를 넣어 이미 등록된 사전 항목을 확인할 수 있습니다.
 - **미등록 용어 판단**: 사전에 없는 항목은 `confidence: "none"`과 `unmatched`로 반환해 신규 용어 등록 필요 여부를 빠르게 판단합니다.
 - **안전한 조합 규칙**: 검증된 단어/도메인 매핑만 조합하고, 애매한 경우에는 후보와 경고를 반환해 잘못된 표준명을 만들지 않습니다.
 - **로컬 `stdio` MCP**: 별도 HTTP 서버 없이 MCP 클라이언트가 로컬 프로세스로 실행할 수 있어 설치와 테스트가 단순합니다.
@@ -18,9 +19,10 @@ CSV 사전을 기반으로 한글 용어명과 물리명을 변환하는 Node.js
 ## 기능
 
 - `stdio` 기반 로컬 MCP 서버
-- 범용 MCP tool: `convert_terms`
+- MCP tool: `convert_terms`, `search_terms`
 - 한글 용어명 -> 물리명 변환
 - 물리명 snake case 또는 물리명 기반 camel case -> 한글 용어명 변환
+- 등록된 사전 row 키워드 검색
 - 여러 줄 입력을 줄 단위로 일괄 변환하고 `items`, `summary` 반환
 - 한글 -> 물리명 변환 결과를 토큰 단위로 다시 확인해 더 표준적인 한글명이 있으면 `reverseCheck`, `annotatedText`로 제안
 - CSV 수정 시 다음 요청에서 자동 재로딩
@@ -139,6 +141,52 @@ CSV 경로 우선순위:
   }
 }
 ```
+
+## Tool: `search_terms`
+
+등록된 CSV 사전 항목을 키워드로 검색합니다. 변환이 아니라 “이미 등록된 항목을 눈으로 확인”하는 기능입니다.
+
+입력:
+
+```ts
+{
+  query: string;
+  fields?: Array<
+    | "termName"
+    | "physicalName"
+    | "domainType"
+    | "domain"
+    | "dataType"
+    | "codeName"
+    | "definition"
+    | "requestTask"
+  >;
+  matchMode?: "contains" | "startsWith" | "exact";
+  limit?: number;
+  offset?: number;
+}
+```
+
+예시:
+
+```json
+{
+  "query": "정비점",
+  "fields": ["termName", "definition", "requestTask"],
+  "limit": 20
+}
+```
+
+```json
+{
+  "query": "VHCL",
+  "fields": ["physicalName"],
+  "matchMode": "startsWith"
+}
+```
+
+출력의 `items`에는 CSV 사전 row와 함께 `score`, `matchedFields`가 포함됩니다.
+`matchedFields`는 어떤 필드가 `exact`, `startsWith`, `contains` 중 어떤 방식으로 매칭됐는지 보여줍니다.
 
 ## 개발
 

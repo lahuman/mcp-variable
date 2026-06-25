@@ -1,7 +1,12 @@
 import { z } from "zod";
 
 import type { TermDictionaryService } from "./service.js";
-import type { ConvertTermsInput, ConvertTermsOutput } from "./types.js";
+import type {
+  ConvertTermsInput,
+  ConvertTermsOutput,
+  SearchTermsInput,
+  SearchTermsOutput
+} from "./types.js";
 
 export const convertTermsInputSchema = z.object({
   text: z
@@ -11,6 +16,28 @@ export const convertTermsInputSchema = z.object({
   direction: z.enum(["auto", "term_to_physical", "physical_to_term"]).default("auto").optional(),
   outputCase: z.enum(["snake", "lowerCamel", "upperCamel"]).default("snake").optional(),
   maxCandidates: z.number().int().min(0).max(50).default(5).optional()
+});
+
+const searchableTermFieldSchema = z.enum([
+  "termName",
+  "physicalName",
+  "domainType",
+  "domain",
+  "dataType",
+  "codeName",
+  "definition",
+  "requestTask"
+]);
+
+export const searchTermsInputSchema = z.object({
+  query: z
+    .string()
+    .min(1)
+    .describe("Keyword to search in registered dictionary rows."),
+  fields: z.array(searchableTermFieldSchema).default([]).optional(),
+  matchMode: z.enum(["contains", "startsWith", "exact"]).default("contains").optional(),
+  limit: z.number().int().min(0).max(100).default(20).optional(),
+  offset: z.number().int().min(0).default(0).optional()
 });
 
 const componentSchema = z.object({
@@ -64,9 +91,46 @@ export const convertTermsOutputSchema = convertTermsItemOutputSchema.extend({
   summary: convertTermsSummarySchema.optional()
 });
 
+const searchMatchedFieldSchema = z.object({
+  field: searchableTermFieldSchema,
+  value: z.string(),
+  matchType: z.enum(["contains", "startsWith", "exact"])
+});
+
+const searchTermsItemOutputSchema = z.object({
+  termName: z.string(),
+  physicalName: z.string(),
+  domainType: z.string(),
+  domain: z.string(),
+  dataType: z.string(),
+  codeName: z.string().optional(),
+  definition: z.string().optional(),
+  requestTask: z.string().optional(),
+  finalRequester: z.string().optional(),
+  finalModifiedAt: z.string().optional(),
+  score: z.number(),
+  matchedFields: z.array(searchMatchedFieldSchema)
+});
+
+export const searchTermsOutputSchema = z.object({
+  query: z.string(),
+  fields: z.array(searchableTermFieldSchema),
+  matchMode: z.enum(["contains", "startsWith", "exact"]),
+  total: z.number().int().nonnegative(),
+  limit: z.number().int().nonnegative(),
+  offset: z.number().int().nonnegative(),
+  items: z.array(searchTermsItemOutputSchema),
+  warnings: z.array(z.string())
+});
+
 export type ConvertTermsToolResult = {
   content: Array<{ type: "text"; text: string }>;
   structuredContent: ConvertTermsOutput & Record<string, unknown>;
+};
+
+export type SearchTermsToolResult = {
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: SearchTermsOutput & Record<string, unknown>;
 };
 
 export function createConvertTermsHandler(
@@ -78,6 +142,19 @@ export function createConvertTermsHandler(
     return {
       content: [{ type: "text", text: JSON.stringify(output, null, 2) }],
       structuredContent: output as ConvertTermsOutput & Record<string, unknown>
+    };
+  };
+}
+
+export function createSearchTermsHandler(
+  service: TermDictionaryService
+): (input: SearchTermsInput) => Promise<SearchTermsToolResult> {
+  return async (input: SearchTermsInput) => {
+    const parsed = searchTermsInputSchema.parse(input);
+    const output = await service.search(parsed);
+    return {
+      content: [{ type: "text", text: JSON.stringify(output, null, 2) }],
+      structuredContent: output as SearchTermsOutput & Record<string, unknown>
     };
   };
 }
