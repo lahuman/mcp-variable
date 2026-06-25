@@ -7,6 +7,8 @@ type SuffixSplit = {
   domainPhysical: string;
 };
 
+const FORCED_DOMAIN_MAPPINGS = new Map<string, string>([["명", "NM"]]);
+
 export function buildDictionary(rows: TermRow[]): TermDictionary {
   const dictionary: TermDictionary = {
     rows,
@@ -50,6 +52,8 @@ export function buildDictionary(rows: TermRow[]): TermDictionary {
     }
   }
 
+  applyForcedDomainMappings(dictionary);
+
   for (const row of rows) {
     const physical = normalizePhysicalName(row.physicalName);
     const components = buildComponents(row, dictionary);
@@ -69,6 +73,28 @@ export function buildDictionary(rows: TermRow[]): TermDictionary {
   }
 
   return dictionary;
+}
+
+function applyForcedDomainMappings(dictionary: TermDictionary): void {
+  for (const [term, physical] of FORCED_DOMAIN_MAPPINGS.entries()) {
+    const normalizedPhysical = normalizePhysicalName(physical);
+    dictionary.domainTermToPhysical.set(term, new Set([normalizedPhysical]));
+
+    for (const [physicalToken, terms] of dictionary.domainPhysicalToTerms.entries()) {
+      if (physicalToken === normalizedPhysical) {
+        continue;
+      }
+
+      terms.delete(term);
+      if (terms.size === 0) {
+        dictionary.domainPhysicalToTerms.delete(physicalToken);
+      }
+    }
+
+    const reverseTerms = dictionary.domainPhysicalToTerms.get(normalizedPhysical) ?? new Set<string>();
+    reverseTerms.add(term);
+    dictionary.domainPhysicalToTerms.set(normalizedPhysical, reverseTerms);
+  }
 }
 
 export function getUniqueMapping(map: Map<string, Set<string>>, key: string): string | undefined {
@@ -166,6 +192,10 @@ function splitBySuffixDomain(
 
   const physicalStemTokens = physicalTokens.slice(0, -1);
   if (physicalStemTokens.length === 0) {
+    if (!isAllowedForcedDomainPhysical(termName, domainPhysical)) {
+      return undefined;
+    }
+
     return {
       wordComponents: [],
       domainTerm: termName,
@@ -195,12 +225,20 @@ function splitBySuffixDomain(
   if (!domainTerm) {
     return undefined;
   }
+  if (!isAllowedForcedDomainPhysical(domainTerm, domainPhysical)) {
+    return undefined;
+  }
 
   return {
     wordComponents,
     domainTerm,
     domainPhysical
   };
+}
+
+function isAllowedForcedDomainPhysical(domainTerm: string, domainPhysical: string): boolean {
+  const forcedPhysical = FORCED_DOMAIN_MAPPINGS.get(domainTerm);
+  return !forcedPhysical || normalizePhysicalName(forcedPhysical) === domainPhysical;
 }
 
 function splitByKnownDomainSuffix(

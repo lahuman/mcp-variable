@@ -349,6 +349,81 @@ describe("term conversion", () => {
     });
   });
 
+  test("forces 명 to the NM domain when source rows infer conflicting name domains", () => {
+    const dictionary = buildDictionary([
+      {
+        termName: "정비내용",
+        physicalName: "RPAR_CN",
+        domainType: "내용",
+        domain: "내용V4000",
+        dataType: "VARCHAR(4000)"
+      },
+      {
+        termName: "계정명",
+        physicalName: "ACCO_NM",
+        domainType: "명",
+        domain: "명V100",
+        dataType: "VARCHAR(100)"
+      },
+      {
+        termName: "정보내용",
+        physicalName: "INFO_CN",
+        domainType: "내용",
+        domain: "내용V4000",
+        dataType: "VARCHAR(4000)"
+      },
+      {
+        termName: "전화번호",
+        physicalName: "TELNO",
+        domainType: "전화번호",
+        domain: "전화번호V11",
+        dataType: "VARCHAR(11)"
+      },
+      {
+        termName: "대리점명",
+        physicalName: "AGNC_NM",
+        domainType: "명",
+        domain: "명V100",
+        dataType: "VARCHAR(100)"
+      },
+      {
+        termName: "담당자명",
+        physicalName: "PERC_NM",
+        domainType: "명",
+        domain: "명V100",
+        dataType: "VARCHAR(100)"
+      },
+      {
+        termName: "영문명",
+        physicalName: "ENG_NAME",
+        domainType: "명",
+        domain: "명V100",
+        dataType: "VARCHAR(100)"
+      },
+      {
+        termName: "영문성명",
+        physicalName: "ENG_NAME",
+        domainType: "성명",
+        domain: "성명V100",
+        dataType: "VARCHAR(100)"
+      }
+    ]);
+
+    expect(dictionary.domainTermToPhysical.get("명")).toEqual(new Set(["NM"]));
+    expect(dictionary.domainTermToPhysical.get("성명")).toEqual(new Set(["NAME"]));
+    expect(dictionary.domainPhysicalToTerms.get("NAME")).toEqual(new Set(["성명"]));
+
+    const result = convertTerms(dictionary, {
+      text: "정비계정정보명\n정비소전화번호\n대리점담당자명",
+      direction: "term_to_physical",
+      outputCase: "snake"
+    });
+
+    expect(result.convertedText).toBe("RPAR_ACCO_INFO_NM\nRPAR소TELNO\nAGNC_PERC_NM");
+    expect(result.unmatched).toEqual(["소"]);
+    expect(result.items?.map((item) => item.unmatched)).toEqual([[], ["소"], []]);
+  });
+
   test("returns candidates and warnings instead of confirming ambiguous compounds", () => {
     const dictionary = buildDictionary(rows);
     const ambiguous = buildDictionary([
@@ -396,9 +471,9 @@ describe("term conversion", () => {
     });
 
     expect(result).toMatchObject({
-      convertedText: "주요ACNT_INFO명",
+      convertedText: "주요ACNT_INFO_NM",
       confidence: "partial",
-      unmatched: ["주요", "명"]
+      unmatched: ["주요"]
     });
   });
 
