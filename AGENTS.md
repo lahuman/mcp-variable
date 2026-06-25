@@ -33,9 +33,9 @@ Regenerate the dictionary only when the user explicitly asks:
 npm run convert:public-standard -- "/path/to/행정안전부_공공데이터 공통표준용어_YYYYMMDD.csv" data/terms.csv
 ```
 
-## Core MCP Tool
+## Public MCP Tools
 
-The only public MCP tool is `convert_terms`.
+### `convert_terms`
 
 Input:
 
@@ -60,6 +60,38 @@ Important output fields:
 - `reverseCheck`: token-level reverse lookup details for suggested Korean term changes
 - `items`: per-line results for bulk conversion
 - `summary`: bulk counts
+
+### `search_terms`
+
+Search registered CSV dictionary rows without converting names.
+
+Input:
+
+```ts
+{
+  query: string;
+  fields?: Array<
+    | "termName"
+    | "physicalName"
+    | "domainType"
+    | "domain"
+    | "dataType"
+    | "codeName"
+    | "definition"
+    | "requestTask"
+  >;
+  matchMode?: "contains" | "startsWith" | "exact";
+  limit?: number;
+  offset?: number;
+}
+```
+
+Important output fields:
+
+- `items`: matching dictionary rows with `score` and `matchedFields`
+- `total`: total matches before pagination
+- `matchedFields`: fields that matched the query and whether each match was `exact`, `startsWith`, or `contains`
+- `warnings`: diagnostics such as reload fallback warnings
 
 ## Mandatory Variable Naming Rule
 
@@ -121,6 +153,7 @@ If the MCP server or `convert_terms` tool is unavailable, tell the user that sta
 - `src/csvLoader.ts`: CSV loading, header normalization, UTF-8/CP949 handling, parser diagnostics
 - `src/dictionary.ts`: attribute, word, and domain index builder
 - `src/matcher.ts`: conversion, composition, bulk conversion, confidence handling
+- `src/search.ts`: keyword dictionary search over registered CSV rows
 - `src/physical.ts`: physical name normalization and camel/snake formatting
 - `scripts/convert-public-standard-terms.ts`: public standard CSV converter
 - `tests/term-converter.test.ts`: unit and MCP handler tests

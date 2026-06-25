@@ -1,6 +1,6 @@
 ---
 name: mcp-variable-naming
-description: Use when Gemini, Antigravity, or another AI coding agent must generate, validate, or convert standard variable names, properties, DTO fields, API payload keys, SQL aliases, database columns, physical names, snake_case names, lowerCamel/UpperCamel names, or names derived from Korean domain dictionary terms.
+description: Use when Gemini, Antigravity, or another AI coding agent must search registered Korean dictionary terms or generate, validate, or convert standard variable names, properties, DTO fields, API payload keys, SQL aliases, database columns, physical names, snake_case names, lowerCamel/UpperCamel names, or names derived from Korean domain dictionary terms.
 ---
 
 # MCP Variable Naming for Gemini
@@ -14,12 +14,25 @@ If the agent session does not automatically load repository instructions, paste 
 ## Required Workflow
 
 1. Identify every business term that will become a variable, property, DTO field, API key, SQL alias, or database column.
-2. Call the `mcp-variable` MCP tool `convert_terms` before finalizing those names.
-3. Use newline-separated bulk input when converting more than one term.
-4. Apply the returned names in code only after checking `confidence`, `unmatched`, `warnings`, and `candidates`.
-5. Mention unresolved naming items in the final response if any term is `partial` or `none`.
+2. If the user needs to inspect existing registered dictionary rows first, call `search_terms` with the user's keyword. Use this for discovery only.
+3. Call the `mcp-variable` MCP tool `convert_terms` before finalizing any code, API, SQL, DB, or physical name.
+4. Use newline-separated bulk input when converting more than one term.
+5. Apply the returned names in code only after checking `confidence`, `unmatched`, `warnings`, and `candidates`.
+6. Mention unresolved naming items in the final response if any term is `partial` or `none`.
 
 ## Tool Calls
+
+For searching registered dictionary rows before choosing a term:
+
+```json
+{
+  "query": "자동차",
+  "fields": ["termName", "definition", "requestTask"],
+  "limit": 20
+}
+```
+
+`search_terms` results show registered rows and matched fields. Do not treat a search result as a confirmed variable or column name; use `convert_terms` for final naming.
 
 For Korean term to code variable names:
 
@@ -100,7 +113,7 @@ Then apply only the resolved names in code. If unresolved names block the implem
 
 ## Missing MCP Tool
 
-If the `mcp-variable` MCP server or `convert_terms` tool is not available:
+If the `mcp-variable` MCP server, `search_terms`, or `convert_terms` tool is not available:
 
 1. Check the project instructions in `AGENTS.md` for the configured server command.
 2. In Gemini/Antigravity, verify that the `mcp-variable` MCP server is enabled in the client MCP configuration.

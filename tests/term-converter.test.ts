@@ -6,8 +6,9 @@ import { describe, expect, test } from "vitest";
 
 import { CsvLoadError, loadCsvFile, parseCsvText } from "../src/csvLoader.js";
 import { buildDictionary } from "../src/dictionary.js";
-import { createConvertTermsHandler } from "../src/mcpTool.js";
+import { createConvertTermsHandler, createSearchTermsHandler } from "../src/mcpTool.js";
 import { convertTerms } from "../src/matcher.js";
+import { searchTerms } from "../src/search.js";
 import { TermDictionaryService } from "../src/service.js";
 import type { TermRow } from "../src/types.js";
 
@@ -493,6 +494,115 @@ describe("term conversion", () => {
   });
 });
 
+describe("term search", () => {
+  const searchRows: TermRow[] = [
+    {
+      termName: "자동차등록번호",
+      physicalName: "VHCL_REG_NO",
+      domainType: "번호",
+      domain: "번호V40",
+      dataType: "VARCHAR(40)",
+      definition: "자동차를 등록할 때 부여한 번호",
+      requestTask: "자동차관리"
+    },
+    {
+      termName: "차량정비점명",
+      physicalName: "VHCL_MTNC_SHOP_NM",
+      domainType: "명",
+      domain: "명V100",
+      dataType: "VARCHAR(100)",
+      definition: "차량 정비점의 명칭",
+      requestTask: "자동차정비"
+    },
+    {
+      termName: "정비점주소",
+      physicalName: "MTNC_SHOP_ADDR",
+      domainType: "주소",
+      domain: "주소V200",
+      dataType: "VARCHAR(200)",
+      definition: "정비점의 소재지 주소",
+      requestTask: "정비업무"
+    },
+    {
+      termName: "등록일자",
+      physicalName: "REG_YMD",
+      domainType: "일자",
+      domain: "일자V8",
+      dataType: "VARCHAR(8)",
+      definition: "등록한 일자",
+      requestTask: "공통"
+    }
+  ];
+
+  test("finds registered dictionary rows by Korean keyword", () => {
+    const result = searchTerms(buildDictionary(searchRows), {
+      query: "정비점",
+      fields: ["termName", "definition"],
+      limit: 10
+    });
+
+    expect(result).toMatchObject({
+      query: "정비점",
+      total: 2,
+      limit: 10,
+      offset: 0,
+      warnings: []
+    });
+    expect(result.items.map((item) => item.termName)).toEqual(["정비점주소", "차량정비점명"]);
+    expect(result.items[0]).toMatchObject({
+      termName: "정비점주소",
+      physicalName: "MTNC_SHOP_ADDR",
+      matchedFields: [
+        {
+          field: "termName",
+          value: "정비점주소",
+          matchType: "startsWith"
+        },
+        {
+          field: "definition",
+          value: "정비점의 소재지 주소",
+          matchType: "startsWith"
+        }
+      ]
+    });
+  });
+
+  test("supports physical-name search without requiring exact case", () => {
+    const result = searchTerms(buildDictionary(searchRows), {
+      query: "vhcl",
+      fields: ["physicalName"],
+      limit: 10
+    });
+
+    expect(result.total).toBe(2);
+    expect(result.items.map((item) => item.physicalName)).toEqual([
+      "VHCL_REG_NO",
+      "VHCL_MTNC_SHOP_NM"
+    ]);
+    expect(result.items[0]?.matchedFields).toEqual([
+      {
+        field: "physicalName",
+        value: "VHCL_REG_NO",
+        matchType: "startsWith"
+      }
+    ]);
+  });
+
+  test("applies match mode and pagination after ranking", () => {
+    const result = searchTerms(buildDictionary(searchRows), {
+      query: "자동차",
+      fields: ["termName", "definition", "requestTask"],
+      matchMode: "contains",
+      limit: 1,
+      offset: 1
+    });
+
+    expect(result.total).toBe(2);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.termName).toBe("차량정비점명");
+  });
+});
+
 describe("reloadable service", () => {
   test("reloads changed CSV files and keeps the last good index after reload failure", async () => {
     const file = await writeTempCsv(
@@ -583,6 +693,54 @@ describe("MCP tool handler", () => {
       "regYmd",
       "rotngRsltVal"
     ]);
+    expect(result.content).toEqual([
+      {
+        type: "text",
+        text: JSON.stringify(result.structuredContent, null, 2)
+      }
+    ]);
+  });
+
+  test("returns dictionary search content and structured search results", async () => {
+    const file = await writeTempCsv(
+      "tool-search",
+      csv([
+        "자동차등록번호,VHCL_REG_NO,번호,번호V40,VARCHAR(40),,자동차를 등록할 때 부여한 번호,자동차관리,System,2026-06-25 10:00:00",
+        "정비점주소,MTNC_SHOP_ADDR,주소,주소V200,VARCHAR(200),,정비점의 소재지 주소,정비업무,System,2026-06-25 10:00:00"
+      ])
+    );
+    const handler = createSearchTermsHandler(new TermDictionaryService(file));
+
+    const result = await handler({
+      query: "정비점",
+      fields: ["termName", "definition"],
+      limit: 5
+    });
+
+    expect(result.structuredContent).toMatchObject({
+      query: "정비점",
+      total: 1,
+      limit: 5,
+      offset: 0,
+      items: [
+        {
+          termName: "정비점주소",
+          physicalName: "MTNC_SHOP_ADDR",
+          matchedFields: [
+            {
+              field: "termName",
+              value: "정비점주소",
+              matchType: "startsWith"
+            },
+            {
+              field: "definition",
+              value: "정비점의 소재지 주소",
+              matchType: "startsWith"
+            }
+          ]
+        }
+      ]
+    });
     expect(result.content).toEqual([
       {
         type: "text",

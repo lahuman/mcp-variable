@@ -11,6 +11,20 @@ Do not create variable names, physical names, field names, or column names from 
 
 ## MCP Usage Rule
 
+Use `search_terms` when the user asks to inspect, browse, or search existing registered dictionary rows before deciding on a business term. Examples include finding entries related to `정비`, `자동차`, or a physical prefix such as `VHCL`.
+
+Example dictionary search:
+
+```json
+{
+  "query": "자동차",
+  "fields": ["termName", "definition", "requestTask"],
+  "limit": 20
+}
+```
+
+`search_terms` is for discovery only. It does not confirm a code identifier, database column, SQL alias, DTO field, or API payload key.
+
 Before creating any of the following names, call the `convert_terms` tool from the `mcp-variable` MCP server:
 
 - variable names

@@ -3,7 +3,14 @@ import { stat } from "node:fs/promises";
 import { loadCsvFile } from "./csvLoader.js";
 import { buildDictionary } from "./dictionary.js";
 import { convertTerms } from "./matcher.js";
-import type { ConvertTermsInput, ConvertTermsOutput, TermDictionary } from "./types.js";
+import { searchTerms } from "./search.js";
+import type {
+  ConvertTermsInput,
+  ConvertTermsOutput,
+  SearchTermsInput,
+  SearchTermsOutput,
+  TermDictionary
+} from "./types.js";
 
 export class TermDictionaryService {
   private dictionary?: TermDictionary;
@@ -14,6 +21,18 @@ export class TermDictionaryService {
   async convert(input: ConvertTermsInput): Promise<ConvertTermsOutput> {
     const reloadWarning = await this.ensureLoaded();
     const result = convertTerms(this.dictionary!, input);
+    if (reloadWarning) {
+      return {
+        ...result,
+        warnings: [...result.warnings, reloadWarning]
+      };
+    }
+    return result;
+  }
+
+  async search(input: SearchTermsInput): Promise<SearchTermsOutput> {
+    const reloadWarning = await this.ensureLoaded();
+    const result = searchTerms(this.dictionary!, input);
     if (reloadWarning) {
       return {
         ...result,

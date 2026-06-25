@@ -8,7 +8,10 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import {
   convertTermsInputSchema,
   convertTermsOutputSchema,
-  createConvertTermsHandler
+  createConvertTermsHandler,
+  createSearchTermsHandler,
+  searchTermsInputSchema,
+  searchTermsOutputSchema
 } from "./mcpTool.js";
 import { TermDictionaryService } from "./service.js";
 
@@ -31,7 +34,8 @@ export function createMcpServer(csvPath: string): McpServer {
     version: "0.1.0"
   });
   const service = new TermDictionaryService(csvPath);
-  const handler = createConvertTermsHandler(service);
+  const convertHandler = createConvertTermsHandler(service);
+  const searchHandler = createSearchTermsHandler(service);
 
   server.registerTool(
     "convert_terms",
@@ -42,7 +46,19 @@ export function createMcpServer(csvPath: string): McpServer {
       inputSchema: convertTermsInputSchema,
       outputSchema: convertTermsOutputSchema
     },
-    async (input) => handler(input)
+    async (input) => convertHandler(input)
+  );
+
+  server.registerTool(
+    "search_terms",
+    {
+      title: "Search Registered Dictionary Terms",
+      description:
+        "Search registered CSV dictionary rows by keyword across Korean terms, physical names, domains, definitions, and request tasks.",
+      inputSchema: searchTermsInputSchema,
+      outputSchema: searchTermsOutputSchema
+    },
+    async (input) => searchHandler(input)
   );
 
   return server;

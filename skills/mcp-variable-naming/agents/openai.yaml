@@ -1,10 +1,10 @@
 interface:
   display_name: "Gemini MCP Variable Naming"
-  short_description: "Use mcp-variable in Gemini/Antigravity for standard names"
-  default_prompt: "Use $mcp-variable-naming in Gemini/Antigravity: follow AGENTS_INIT.md and call convert_terms before generating standard variable names."
+  short_description: "Use mcp-variable in Gemini/Antigravity for dictionary search and standard names"
+  default_prompt: "Use $mcp-variable-naming in Gemini/Antigravity: follow AGENTS_INIT.md, call search_terms to inspect registered dictionary rows when needed, and call convert_terms before generating standard variable names."
 
 dependencies:
   tools:
     - type: "mcp"
       value: "mcp-variable"
-      description: "Local MCP server that exposes convert_terms for Korean term, physical name, and variable name conversion."
+      description: "Local MCP server that exposes search_terms for registered dictionary lookup and convert_terms for Korean term, physical name, and variable name conversion."
