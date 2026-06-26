@@ -1,10 +1,15 @@
-import { mkdtemp, readFile, writeFile, utimes } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, mkdtemp, readFile, writeFile, utimes } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import { CsvLoadError, loadCsvFile, parseCsvText } from "../src/csvLoader.js";
+import {
+  getDictionaryCachePath,
+  loadDictionaryWithCache,
+  writeDictionaryCache
+} from "../src/cache.js";
 import { buildDictionary } from "../src/dictionary.js";
 import { createConvertTermsHandler, createSearchTermsHandler } from "../src/mcpTool.js";
 import { convertTerms } from "../src/matcher.js";
@@ -206,6 +211,185 @@ describe("dictionary building", () => {
     expect(dictionary.warnings).toContain(
       "Could not verify word segmentation for 라우팅결과값 -> ROTNG_RSLT_VAL"
     );
+  });
+
+  test("infers one missing word token when surrounding mappings verify segmentation", () => {
+    const dictionary = buildDictionary([
+      {
+        termName: "사례내용",
+        physicalName: "CASE_CN",
+        domainType: "내용",
+        domain: "내용V4000",
+        dataType: "VARCHAR(4000)"
+      },
+      {
+        termName: "우수사례내용",
+        physicalName: "EXLN_CASE_CN",
+        domainType: "내용",
+        domain: "내용V4000",
+        dataType: "VARCHAR(4000)"
+      }
+    ]);
+
+    expect(dictionary.termToPhysical.get("우수")).toEqual(new Set(["EXLN"]));
+    expect(dictionary.physicalToTerms.get("EXLN")).toEqual(new Set(["우수"]));
+    expect(dictionary.attributeByTerm.get("우수사례내용")?.components).toEqual([
+      { term: "우수", physical: "EXLN", role: "word" },
+      { term: "사례", physical: "CASE", role: "word" },
+      { term: "내용", physical: "CN", role: "domain" }
+    ]);
+  });
+});
+
+describe("dictionary cache", () => {
+  test("serializes a built dictionary and restores Map and Set indexes", async () => {
+    const file = await writeTempCsv(
+      "cache-roundtrip",
+      csv([
+        "등록일자,REG_YMD,일자,일자V8,VARCHAR(8),,,EDA,System Manager,2023-12-01 15:34:44",
+        "결과값,RSLT_VAL,값,값V10,VARCHAR(10),,,EDA,System Manager,2023-12-01 15:34:44",
+        "등록결과값,REG_RSLT_VAL,값,값V10,VARCHAR(10),,,EDA,System Manager,2023-12-01 15:34:44"
+      ])
+    );
+
+    const firstLoad = await loadDictionaryWithCache(file);
+    const secondLoad = await loadDictionaryWithCache(file);
+
+    expect(firstLoad.source).toBe("csv");
+    expect(secondLoad.source).toBe("cache");
+    expect(secondLoad.dictionary.attributeByTerm.get("등록결과값")?.physical).toBe("REG_RSLT_VAL");
+    expect(secondLoad.dictionary.termToPhysical.get("등록")).toEqual(new Set(["REG"]));
+    expect(secondLoad.dictionary.domainTermToPhysical.get("값")).toEqual(new Set(["VAL"]));
+  });
+
+  test("invalidates the cache when the CSV hash changes", async () => {
+    const file = await writeTempCsv(
+      "cache-invalidate",
+      csv(["등록일자,REG_YMD,일자,일자V8,VARCHAR(8),,,EDA,System Manager,2023-12-01 15:34:44"])
+    );
+
+    expect((await loadDictionaryWithCache(file)).source).toBe("csv");
+    expect((await loadDictionaryWithCache(file)).source).toBe("cache");
+
+    await writeFile(
+      file,
+      csv(["등록일자,REG_DT,일자,일자V8,VARCHAR(8),,,EDA,System Manager,2023-12-01 15:34:44"]),
+      "utf8"
+    );
+    await bumpMtime(file);
+
+    const changedLoad = await loadDictionaryWithCache(file);
+
+    expect(changedLoad.source).toBe("csv");
+    expect(changedLoad.dictionary.attributeByTerm.get("등록일자")?.physical).toBe("REG_DT");
+  });
+
+  test("falls back to rebuilding from CSV when the cache file is unreadable", async () => {
+    const file = await writeTempCsv(
+      "cache-corrupt",
+      csv(["등록일자,REG_YMD,일자,일자V8,VARCHAR(8),,,EDA,System Manager,2023-12-01 15:34:44"])
+    );
+    const cachePath = getDictionaryCachePath(file);
+    await mkdir(dirname(cachePath), { recursive: true });
+    await writeFile(cachePath, "{not-json", "utf8");
+
+    const result = await loadDictionaryWithCache(file);
+
+    expect(result.source).toBe("csv");
+    expect(result.dictionary.attributeByTerm.get("등록일자")?.physical).toBe("REG_YMD");
+  });
+
+  test("keeps serving a CSV-built dictionary when writing the cache fails", async () => {
+    const file = await writeTempCsv(
+      "cache-write-failure",
+      csv(["등록일자,REG_YMD,일자,일자V8,VARCHAR(8),,,EDA,System Manager,2023-12-01 15:34:44"])
+    );
+    await writeFile(join(dirname(file), ".cache"), "not a directory", "utf8");
+
+    const result = await loadDictionaryWithCache(file);
+
+    expect(result.source).toBe("csv");
+    expect(result.dictionary.attributeByTerm.get("등록일자")?.physical).toBe("REG_YMD");
+  });
+
+  test("writes cache files safely when concurrent writes share a timestamp", async () => {
+    const file = await writeTempCsv(
+      "cache-concurrent-write",
+      csv(["등록일자,REG_YMD,일자,일자V8,VARCHAR(8),,,EDA,System Manager,2023-12-01 15:34:44"])
+    );
+    const dictionary = buildDictionary([
+      {
+        termName: "등록일자",
+        physicalName: "REG_YMD",
+        domainType: "일자",
+        domain: "일자V8",
+        dataType: "VARCHAR(8)"
+      }
+    ]);
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(123);
+
+    try {
+      await Promise.all([writeDictionaryCache(file, dictionary), writeDictionaryCache(file, dictionary)]);
+    } finally {
+      nowSpy.mockRestore();
+    }
+
+    expect((await loadDictionaryWithCache(file)).source).toBe("cache");
+  });
+
+  test("rejects stale cache metadata before restoring dictionary indexes", async () => {
+    const file = await writeTempCsv(
+      "cache-stale",
+      csv(["등록일자,REG_YMD,일자,일자V8,VARCHAR(8),,,EDA,System Manager,2023-12-01 15:34:44"])
+    );
+    const dictionary = buildDictionary([
+      {
+        termName: "등록일자",
+        physicalName: "REG_YMD",
+        domainType: "일자",
+        domain: "일자V8",
+        dataType: "VARCHAR(8)"
+      }
+    ]);
+
+    await writeDictionaryCache(file, dictionary, { sha256: "stale", size: 1, mtimeMs: 1 });
+
+    const result = await loadDictionaryWithCache(file);
+
+    expect(result.source).toBe("csv");
+    expect(result.dictionary.attributeByTerm.get("등록일자")?.physical).toBe("REG_YMD");
+  });
+
+  test("rejects stale dictionary builder caches before restoring dictionary indexes", async () => {
+    const file = await writeTempCsv(
+      "cache-stale-builder",
+      csv([
+        "사례내용,CASE_CN,내용,내용V4000,VARCHAR(4000),,,테스트,System,2026-06-26 00:00:00",
+        "우수사례내용,EXLN_CASE_CN,내용,내용V4000,VARCHAR(4000),,,테스트,System,2026-06-26 00:00:00"
+      ])
+    );
+    const staleDictionary = buildDictionary([
+      {
+        termName: "등록일자",
+        physicalName: "REG_YMD",
+        domainType: "일자",
+        domain: "일자V8",
+        dataType: "VARCHAR(8)"
+      }
+    ]);
+
+    await writeDictionaryCache(file, staleDictionary);
+    const cachePath = getDictionaryCachePath(file);
+    const stalePayload = JSON.parse(await readFile(cachePath, "utf8")) as {
+      builder: { dictionaryAlgorithmVersion: number };
+    };
+    stalePayload.builder.dictionaryAlgorithmVersion = 1;
+    await writeFile(cachePath, `${JSON.stringify(stalePayload)}\n`, "utf8");
+
+    const result = await loadDictionaryWithCache(file);
+
+    expect(result.source).toBe("csv");
+    expect(result.dictionary.termToPhysical.get("우수")).toEqual(new Set(["EXLN"]));
   });
 });
 

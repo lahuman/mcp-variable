@@ -1,7 +1,6 @@
 import { stat } from "node:fs/promises";
 
-import { loadCsvFile } from "./csvLoader.js";
-import { buildDictionary } from "./dictionary.js";
+import { loadDictionaryWithCache } from "./cache.js";
 import { convertTerms } from "./matcher.js";
 import { searchTerms } from "./search.js";
 import type {
@@ -15,6 +14,7 @@ import type {
 export class TermDictionaryService {
   private dictionary?: TermDictionary;
   private loadedMtimeMs?: number;
+  private loadedSize?: number;
 
   constructor(private readonly csvPath: string) {}
 
@@ -48,14 +48,19 @@ export class TermDictionaryService {
 
   private async ensureLoaded(): Promise<string | undefined> {
     const fileStat = await stat(this.csvPath);
-    if (this.dictionary && this.loadedMtimeMs === fileStat.mtimeMs) {
+    if (
+      this.dictionary &&
+      this.loadedMtimeMs === fileStat.mtimeMs &&
+      this.loadedSize === fileStat.size
+    ) {
       return undefined;
     }
 
     try {
-      const rows = await loadCsvFile(this.csvPath);
-      this.dictionary = buildDictionary(rows);
+      const { dictionary } = await loadDictionaryWithCache(this.csvPath);
+      this.dictionary = dictionary;
       this.loadedMtimeMs = fileStat.mtimeMs;
+      this.loadedSize = fileStat.size;
       return undefined;
     } catch (error) {
       if (!this.dictionary) {

@@ -282,11 +282,95 @@ function segmentKnownDomainStem(
     return wordComponents;
   }
 
+  const inferredComponents = segmentByTokensWithSingleInferredWord(stem, physicalTokens, dictionary);
+  if (inferredComponents) {
+    return inferredComponents;
+  }
+
   if (stem && physicalTokens.length === 1) {
     return [{ term: stem, physical: physicalTokens[0]!, role: "word" }];
   }
 
   return undefined;
+}
+
+function segmentByTokensWithSingleInferredWord(
+  text: string,
+  physicalTokens: string[],
+  dictionary: TermDictionary
+): TermComponent[] | undefined {
+  if (!text || physicalTokens.length < 2) {
+    return undefined;
+  }
+
+  const solutions = new Map<string, TermComponent[]>();
+
+  function visit(
+    remaining: string,
+    tokenIndex: number,
+    inferred: boolean,
+    knownCount: number,
+    components: TermComponent[]
+  ): void {
+    if (solutions.size > 1) {
+      return;
+    }
+
+    if (tokenIndex === physicalTokens.length) {
+      if (!remaining && inferred && knownCount > 0) {
+        const signature = components
+          .map((component) => `${component.term}:${component.physical}`)
+          .join("|");
+        solutions.set(signature, components);
+      }
+      return;
+    }
+
+    if (!remaining) {
+      return;
+    }
+
+    const physicalToken = physicalTokens[tokenIndex]!;
+    const knownTerms = [...(dictionary.physicalToTerms.get(physicalToken) ?? [])].sort(
+      (a, b) => b.length - a.length
+    );
+
+    for (const term of knownTerms) {
+      if (!remaining.startsWith(term)) {
+        continue;
+      }
+
+      visit(remaining.slice(term.length), tokenIndex + 1, inferred, knownCount + 1, [
+        ...components,
+        { term, physical: physicalToken, role: "word" }
+      ]);
+    }
+
+    if (inferred) {
+      return;
+    }
+    if (dictionary.physicalToTerms.has(physicalToken)) {
+      return;
+    }
+
+    const remainingTokenCount = physicalTokens.length - tokenIndex - 1;
+    const maxInferredLength = remaining.length - remainingTokenCount;
+    for (let length = 1; length <= maxInferredLength; length += 1) {
+      const term = remaining.slice(0, length);
+      if (dictionary.termToPhysical.has(term)) {
+        continue;
+      }
+
+      visit(remaining.slice(length), tokenIndex + 1, true, knownCount, [
+        ...components,
+        { term, physical: physicalToken, role: "word" }
+      ]);
+    }
+  }
+
+  visit(text, 0, false, 0, []);
+
+  return solutions.size === 1 ? [...solutions.values()][0] : undefined;
 }
 
 function segmentByTokens(

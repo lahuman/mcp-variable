@@ -13,7 +13,8 @@
     "start": "node dist/server.js",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "check:presentation": "node scripts/check-beginner-presentation.mjs"
+    "check:presentation": "node scripts/check-beginner-presentation.mjs",
+    "check:application-presentation": "node scripts/check-application-presentation.mjs"
   },
   "engines": {
     "node": ">=20"
