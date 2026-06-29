@@ -4,13 +4,16 @@
   "description": "CSV-backed Korean term and physical-name conversion MCP server",
   "type": "module",
   "bin": {
-    "mcp-variable": "./dist/server.js"
+    "mcp-variable": "./dist/server.js",
+    "mcp-variable-sse": "./dist/server_sse.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "convert:public-standard": "tsx scripts/convert-public-standard-terms.ts",
     "dev": "tsx src/server.ts",
+    "dev:sse": "tsx src/server_sse.ts",
     "start": "node dist/server.js",
+    "start:sse": "node dist/server_sse.js",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check:presentation": "node scripts/check-beginner-presentation.mjs",

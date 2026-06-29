@@ -401,6 +401,10 @@
       box-shadow: var(--shadow);
     }
 
+    .closing h2 {
+      font-size: clamp(1.95rem, 3.4vw, 3.05rem);
+    }
+
     .nav-dots {
       position: fixed;
       right: 18px;
@@ -490,6 +494,45 @@
         height: 18px;
       }
     }
+
+    @media print {
+      @page {
+        size: 16in 9in;
+        margin: 0;
+      }
+
+      html,
+      body {
+        width: 16in;
+        height: 9in;
+        background: var(--bg);
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      html {
+        scroll-snap-type: none;
+      }
+
+      .slide {
+        width: 16in;
+        height: 9in;
+        min-height: 9in;
+        padding: 0.72in 1.02in 0.82in;
+        break-after: page;
+        page-break-after: always;
+        border-bottom: 0;
+      }
+
+      .slide:last-of-type {
+        break-after: auto;
+        page-break-after: auto;
+      }
+
+      .nav-dots {
+        display: none;
+      }
+    }
   </style>
 </head>
 <body>
@@ -498,7 +541,7 @@
       <div class="slide-inner">
         <p class="eyebrow">업무 변수명 표준화</p>
         <h1 id="title-1">mcp-variable</h1>
-        <p class="lead">AI와 개발자가 변수명을 추측하지 않고, CSV 기반 도메인 사전에서 확인한 이름을 쓰게 만드는 로컬 MCP 서버입니다.</p>
+        <p class="lead">AI와 개발자가 변수명을 추측하지 않도록, CSV 도메인 사전에서 확인한 이름만 쓰게 해주는 로컬 MCP 서버입니다.</p>
         <div class="grid aside">
           <div class="hero-board">
             <h3>대표 변환</h3>
@@ -516,7 +559,7 @@
           <div class="card green">
             <span class="metric green">13,171</span>
             <h3>공공표준용어 기반 변환 행</h3>
-            <p class="small">기본 사전은 `data/terms.csv`이며, 폐기된 원천 행은 제외되어 있습니다.</p>
+            <p class="small">기본 사전은 `data/terms.csv`입니다. 폐기된 원천 행은 빼고 담았습니다.</p>
             <div class="tag-row">
               <span class="tag">용어명</span>
               <span class="tag">물리명</span>
@@ -532,15 +575,15 @@
       <div class="slide-inner">
         <p class="eyebrow">문제 정의</p>
         <h2 id="title-2">추측할 때 생기는 불일치</h2>
-        <p class="lead">업무 용어 하나가 코드로 들어가기까지 표준 한글명, 물리 약어, 도메인 접미사, identifier case를 모두 지나갑니다. 이 과정이 사람의 기억이나 AI의 일반 지식에 맡겨지면 이름이 쉽게 갈라집니다.</p>
+        <p class="lead">업무 용어 하나가 코드 이름이 되기까지 표준 한글명, 물리 약어, 도메인 접미사, identifier case를 차례로 거칩니다. 이 판단을 사람의 기억이나 AI의 일반 지식에 맡기면 이름은 금방 갈라집니다.</p>
         <div class="grid three">
           <div class="card coral">
             <span class="metric">6.9%</span>
             <h3>같은 이름을 고를 확률</h3>
-            <p class="small">`How Developers Choose Names`는 47개 naming instance에서 두 개발자가 같은 이름을 고를 median probability가 6.9%였다고 보고합니다.</p>
+            <p class="small">`How Developers Choose Names`는 47개 naming instance를 분석했습니다. 두 개발자가 같은 이름을 고른 median probability는 6.9%였습니다.</p>
           </div>
           <div class="card amber">
-            <h3>한국어 업무 시스템에서는 더 복잡합니다</h3>
+            <h3>한국어 업무 시스템은 더 까다롭습니다</h3>
             <ul>
               <li>표준 업무 용어 확인</li>
               <li>승인된 물리 약어 확인</li>
@@ -549,7 +592,7 @@
           </div>
           <div class="card blue">
             <h3>mcp-variable의 방향</h3>
-            <p class="small">웹 검색이나 기억 대신 `convert_terms`가 사전을 확인하고, 결과의 `confidence`로 적용 가능성을 판단합니다.</p>
+            <p class="small">웹 검색이나 기억에 기대지 않습니다. `convert_terms`가 사전을 확인하고, `confidence`가 적용 여부를 알려줍니다.</p>
           </div>
         </div>
       </div>
@@ -559,7 +602,7 @@
       <div class="slide-inner">
         <p class="eyebrow">1막</p>
         <h2 id="title-3">적용 업무</h2>
-        <p class="lead">변수명 문제는 특정 계층 하나의 일이 아닙니다. DTO, API, DB, SQL, 리뷰와 리팩터링까지 같은 업무 용어가 여러 표면에 반복해서 등장합니다.</p>
+        <p class="lead">변수명은 한 계층에서만 정하지 않습니다. 같은 업무 용어가 DTO, API, DB, SQL, 리뷰와 리팩터링에 계속 나타납니다.</p>
         <div class="flow">
           <div class="flow-item"><strong>DTO 필드</strong><span>lowerCamel 코드 식별자</span></div>
           <div class="flow-item"><strong>API payload key</strong><span>요청/응답 계약</span></div>
@@ -574,7 +617,7 @@
       <div class="slide-inner">
         <p class="eyebrow">적용 업무</p>
         <h2 id="title-4">적용 업무: DTO 필드</h2>
-        <p class="lead">DTO 필드는 업무 의미가 코드에 처음 드러나는 자리입니다. 기본 원칙은 한국어 업무 용어를 모아서 `lowerCamel`로 변환하고, exact 결과만 바로 적용하는 것입니다.</p>
+        <p class="lead">DTO 필드는 업무 의미가 코드에 처음 드러나는 자리입니다. 한글 업무 용어를 모아 `lowerCamel`로 바꾸고, exact 결과만 바로 씁니다.</p>
         <div class="grid three">
           <div class="example blue">
             <h3>등록일자</h3>
@@ -599,7 +642,7 @@
       <div class="slide-inner">
         <p class="eyebrow">적용 업무</p>
         <h2 id="title-5">적용 업무: API payload key</h2>
-        <p class="lead">API request와 response key는 DTO와 같은 사전 기반 이름을 공유해야 합니다. 그래야 클라이언트와 서버가 서로 다른 추측을 하지 않습니다.</p>
+        <p class="lead">API request와 response key도 DTO와 같은 이름을 써야 합니다. 그래야 클라이언트와 서버가 서로 다른 이름을 만들지 않습니다.</p>
         <div class="comparison">
           <div class="card coral">
             <h3>추측 기반</h3>
@@ -614,7 +657,7 @@
             <ul>
               <li><code>등록일자</code>는 <code>regYmd</code>로 확인</li>
               <li><code>사용여부</code>는 <code>useYn</code>으로 확인</li>
-              <li>payload key와 DTO 필드가 같은 근거를 공유</li>
+              <li>payload key와 DTO 필드가 같은 근거를 봄</li>
             </ul>
           </div>
         </div>
@@ -625,7 +668,7 @@
       <div class="slide-inner">
         <p class="eyebrow">적용 업무</p>
         <h2 id="title-6">적용 업무: DB 컬럼과 물리명</h2>
-        <p class="lead">DB 컬럼과 물리명은 `snake` 출력으로 맞춥니다. 마지막 물리 토큰은 도메인 물리 토큰으로 해석되므로, 약어와 데이터 의미를 함께 확인할 수 있습니다.</p>
+        <p class="lead">DB 컬럼과 물리명은 `snake`로 맞춥니다. 마지막 물리 토큰은 도메인 토큰이므로, 약어와 데이터 의미를 함께 확인합니다.</p>
         <div class="grid three">
           <div class="example blue">
             <h3>등록일자</h3>
@@ -650,7 +693,7 @@
       <div class="slide-inner">
         <p class="eyebrow">적용 업무</p>
         <h2 id="title-7">적용 업무: SQL alias와 검색 조건</h2>
-        <p class="lead">SQL alias와 검색 조건이 애플리케이션 이름과 어긋나면, 쿼리를 읽는 순간 의미를 다시 번역해야 합니다. 같은 한국어 용어에서 SQL과 코드 이름을 함께 뽑으면 drift가 줄어듭니다.</p>
+        <p class="lead">SQL alias와 검색 조건이 애플리케이션 이름과 어긋나면 쿼리를 읽을 때마다 의미를 다시 번역해야 합니다. 같은 한글 용어에서 SQL 이름과 코드 이름을 함께 뽑으면 drift가 줄어듭니다.</p>
         <div class="grid aside">
           <div class="card blue">
             <h3>한 용어에서 두 표면으로</h3>
@@ -680,12 +723,12 @@ where u.REG_YMD >= :startRegYmd</code></pre>
       <div class="slide-inner">
         <p class="eyebrow">적용 업무</p>
         <h2 id="title-8">적용 업무: 코드 리뷰와 리팩터링</h2>
-        <p class="lead">리뷰는 "내가 보기엔 이 이름이 낫다"에서 "사전이 어떤 이름과 confidence를 반환했나"로 옮겨갈 수 있습니다. 리팩터링에서는 줄 단위 bulk 변환으로 반복 용어를 한 번에 확인합니다.</p>
+        <p class="lead">리뷰의 기준을 취향에서 사전 근거로 옮깁니다. "내가 보기엔"보다 "사전이 어떤 이름과 confidence를 돌려줬나"를 먼저 봅니다. 리팩터링할 때는 줄 단위 bulk 변환으로 반복 용어를 한 번에 확인합니다.</p>
         <div class="grid two">
           <div class="card green">
             <h3>리뷰 질문</h3>
             <ul>
-              <li>이 필드의 한국어 업무 용어는 무엇인가?</li>
+              <li>이 필드의 한글 업무 용어는 무엇인가?</li>
               <li>`convert_terms` 결과는 exact인가?</li>
               <li>`warnings`나 `candidates`가 있는가?</li>
             </ul>
@@ -704,7 +747,7 @@ where u.REG_YMD >= :startRegYmd</code></pre>
       <div class="slide-inner">
         <p class="eyebrow">2막</p>
         <h2 id="title-9">적용 방법</h2>
-        <p class="lead">적용 방법은 단순합니다. 로컬 사전을 가진 MCP 서버를 AI 클라이언트에 연결하고, Skill이 언제 어떤 입력으로 `convert_terms`를 호출할지 고정합니다.</p>
+        <p class="lead">적용 방법은 복잡하지 않습니다. 로컬 CSV 사전을 MCP 서버로 열고, Skill이 `convert_terms`를 부를 시점과 입력 형식을 정합니다.</p>
         <div class="flow compact">
           <div class="flow-item"><strong>CSV 사전</strong><span>`data/terms.csv`</span></div>
           <div class="flow-item"><strong>MCP 서버</strong><span>local stdio</span></div>
@@ -718,7 +761,7 @@ where u.REG_YMD >= :startRegYmd</code></pre>
       <div class="slide-inner">
         <p class="eyebrow">적용 방법</p>
         <h2 id="title-10">적용 방법: MCP 서버 빌드와 연결</h2>
-        <p class="lead">소스가 바뀐 뒤에는 빌드가 필요합니다. MCP 클라이언트는 TypeScript 소스가 아니라 `dist/server.js`를 실행합니다.</p>
+        <p class="lead">소스를 바꿨다면 빌드해야 합니다. MCP 클라이언트는 TypeScript 소스가 아니라 `dist/server.js`를 실행합니다.</p>
         <div class="grid aside">
           <div class="card">
             <h3>실행 순서</h3>
@@ -753,13 +796,13 @@ where u.REG_YMD >= :startRegYmd</code></pre>
       <div class="slide-inner">
         <p class="eyebrow">적용 방법</p>
         <h2 id="title-11">적용 방법: Skill 워크플로우</h2>
-        <p class="lead">MCP는 도구를 제공하고, Skill은 AI에게 그 도구를 써야 하는 순간과 판단 기준을 알려줍니다.</p>
+        <p class="lead">MCP는 도구를 열어주고, Skill은 AI에게 언제 그 도구를 써야 하는지 알려줍니다.</p>
         <div class="flow">
-          <div class="flow-item"><strong>1. 용어 수집</strong><span>업무 한글명을 먼저 모음</span></div>
+          <div class="flow-item"><strong>1. 용어 수집</strong><span>한글 업무명을 먼저 모음</span></div>
           <div class="flow-item"><strong>2. bulk 입력</strong><span>줄 단위로 `convert_terms` 호출</span></div>
           <div class="flow-item"><strong>3. case 선택</strong><span>code는 `lowerCamel`, DB는 `snake`</span></div>
           <div class="flow-item"><strong>4. 결과 판단</strong><span>`confidence`, `warnings`, `candidates` 확인</span></div>
-          <div class="flow-item"><strong>5. 적용</strong><span>검증된 이름만 반영</span></div>
+          <div class="flow-item"><strong>5. 적용</strong><span>확인된 이름만 반영</span></div>
         </div>
       </div>
     </section>
@@ -768,7 +811,7 @@ where u.REG_YMD >= :startRegYmd</code></pre>
       <div class="slide-inner">
         <p class="eyebrow">적용 방법</p>
         <h2 id="title-12">적용 방법: convert_terms 입력 예시</h2>
-        <p class="lead">변환은 자유 번역 프롬프트가 아니라 구조화된 도구 호출입니다. 여러 용어는 newline-separated bulk input으로 보냅니다.</p>
+        <p class="lead">변환은 자유 번역 프롬프트가 아닙니다. 정해진 입력으로 사전을 조회하는 도구 호출입니다. 여러 용어는 줄바꿈으로 묶어 보냅니다.</p>
         <div class="grid two">
           <div class="card green">
             <h3>DTO 필드명</h3>
@@ -794,12 +837,12 @@ where u.REG_YMD >= :startRegYmd</code></pre>
       <div class="slide-inner">
         <p class="eyebrow">적용 방법</p>
         <h2 id="title-13">적용 방법: confidence 판단 규칙</h2>
-        <p class="lead">도구가 이름을 반환해도 바로 쓰지 않습니다. `confidence`, `unmatched`, `warnings`, `candidates`, `reverseCheck`를 보고 적용 여부를 결정합니다.</p>
+        <p class="lead">이름이 돌아와도 곧장 쓰지 않습니다. `confidence`, `unmatched`, `warnings`, `candidates`, `reverseCheck`를 보고 적용 여부를 정합니다.</p>
         <div class="rule-list">
-          <div class="rule"><strong>exact</strong><span>사전에 등록된 정확한 매핑입니다. 바로 적용할 수 있습니다.</span></div>
-          <div class="rule"><strong>composed</strong><span>검증된 단어와 도메인 조합입니다. warning과 candidate를 확인한 뒤 적용합니다.</span></div>
+          <div class="rule"><strong>exact</strong><span>사전에 등록된 정확한 매핑입니다. 바로 씁니다.</span></div>
+          <div class="rule"><strong>composed</strong><span>검증된 단어와 도메인 조합입니다. warning과 candidate를 먼저 봅니다.</span></div>
           <div class="rule"><strong>partial</strong><span>일부만 찾았습니다. 최종 이름을 조용히 확정하지 않습니다.</span></div>
-          <div class="rule"><strong>none</strong><span>사전에 없습니다. 웹 검색이나 일반 번역으로 대체하지 않습니다.</span></div>
+          <div class="rule"><strong>none</strong><span>사전에 없습니다. 웹 검색이나 일반 번역으로 메우지 않습니다.</span></div>
         </div>
       </div>
     </section>
@@ -808,12 +851,12 @@ where u.REG_YMD >= :startRegYmd</code></pre>
       <div class="slide-inner">
         <p class="eyebrow">3막</p>
         <h2 id="title-14">적용 효과</h2>
-        <p class="lead">효과는 단지 변수명을 빨리 짓는 데서 끝나지 않습니다. 팀의 명명 기준이 사전과 도구 호출 기록 위에 놓이면서, AI 결과와 사람 리뷰가 같은 기준을 보게 됩니다.</p>
+        <p class="lead">효과는 속도만이 아닙니다. 팀의 명명 기준이 사전과 도구 호출 기록 위에 놓입니다. AI 결과와 사람 리뷰가 같은 기준을 봅니다.</p>
         <div class="grid four">
-          <div class="card blue"><h3>일관성</h3><p class="small">동일 용어가 동일 이름으로 반복됩니다.</p></div>
-          <div class="card green"><h3>리뷰 속도</h3><p class="small">취향 논쟁보다 근거 확인에 집중합니다.</p></div>
-          <div class="card amber"><h3>AI 품질</h3><p class="small">AI가 웹 검색 대신 로컬 사전을 호출합니다.</p></div>
-          <div class="card coral"><h3>표준 축적</h3><p class="small">미등록 용어를 팀 사전 관리 이슈로 드러냅니다.</p></div>
+          <div class="card blue"><h3>일관성</h3><p class="small">같은 용어가 같은 이름으로 반복됩니다.</p></div>
+          <div class="card green"><h3>리뷰 속도</h3><p class="small">취향 논쟁을 줄이고 근거를 봅니다.</p></div>
+          <div class="card amber"><h3>AI 품질</h3><p class="small">AI가 웹 검색 대신 로컬 사전을 봅니다.</p></div>
+          <div class="card coral"><h3>표준 축적</h3><p class="small">미등록 용어가 사전 관리 이슈로 드러납니다.</p></div>
         </div>
       </div>
     </section>
@@ -822,12 +865,12 @@ where u.REG_YMD >= :startRegYmd</code></pre>
       <div class="slide-inner">
         <p class="eyebrow">적용 효과</p>
         <h2 id="title-15">적용 효과: 추측에서 표준으로</h2>
-        <p class="lead">눈에 보이는 변화는 naming decision이 흩어진 개인 판단에서 하나의 반복 가능한 workflow로 이동하는 것입니다.</p>
+        <p class="lead">달라지는 지점은 분명합니다. 이름을 개인 감각으로 정하지 않고, 모두가 같은 workflow에서 확인합니다.</p>
         <div class="comparison">
           <div class="card coral">
             <h3>Before</h3>
             <ul>
-              <li>AI가 웹 검색, 일반 지식, 기억으로 이름을 제안</li>
+              <li>AI가 웹 검색, 일반 지식, 기억으로 이름을 만듦</li>
               <li>개발자마다 약어와 도메인 해석이 다름</li>
               <li>리뷰에서 이름 변경 요청이 반복됨</li>
             </ul>
@@ -836,7 +879,7 @@ where u.REG_YMD >= :startRegYmd</code></pre>
             <h3>After</h3>
             <ul>
               <li>신뢰하는 CSV 사전에서 이름을 확인</li>
-              <li>`convert_terms` 결과와 `confidence`를 함께 검토</li>
+              <li>`convert_terms` 결과와 `confidence`를 함께 확인</li>
               <li>Skill이 같은 절차를 매번 재사용</li>
             </ul>
           </div>
@@ -849,7 +892,7 @@ where u.REG_YMD >= :startRegYmd</code></pre>
         <p class="eyebrow">마무리</p>
         <div class="closing">
           <h2 id="title-16">변수명은 추측하지 않고 사전에 확인한다</h2>
-          <p class="lead">팀이 AI에게 줄 요청도 짧아집니다. <strong>Skill을 따라 DTO 필드명으로 변환해줘</strong> 라고 말하면, AI는 사전 확인, case 선택, confidence 판단까지 같은 절차로 움직일 수 있습니다.</p>
+          <p class="lead">AI에게 줄 요청도 짧아집니다. <strong>Skill을 따라 DTO 필드명으로 변환해줘</strong>라고 말하면 됩니다. 그러면 AI는 사전 확인, case 선택, confidence 판단을 같은 절차로 처리합니다.</p>
           <div class="tag-row">
             <span class="tag">적용 업무</span>
             <span class="tag">적용 방법</span>

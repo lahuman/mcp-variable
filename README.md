@@ -63,6 +63,16 @@ npm run build
 node dist/server.js --csv ./data/terms.csv
 ```
 
+SSE 기반 HTTP 서버로 실행할 때:
+
+```bash
+npm run build
+node dist/server_sse.js --csv ./data/terms.csv --host 127.0.0.1 --port 3000
+```
+
+SSE 엔드포인트는 기본적으로 `GET /sse`, 메시지 POST 엔드포인트는 `/messages`입니다.
+개발 중에는 `npm run dev:sse -- --csv ./data/terms.csv`로 바로 실행할 수 있습니다.
+
 CSV 경로 우선순위:
 
 1. `--csv <path>`

@@ -162,33 +162,41 @@ function convertTermToPhysical(
     const target = formatPhysicalName(exact.physical, input.outputCase);
     return withReverseCheck(
       dictionary,
-      {
-        direction: "term_to_physical",
-        input: text,
-        convertedText: target,
-        confidence: "exact",
-        matches: [
-          {
-            source: text,
-            target,
-            type: "attribute",
-            components: exact.components
-          }
-        ],
-        candidates: [],
-        unmatched: [],
-        warnings: []
-      },
+      withPhysicalDomainSuffixWarning(
+        dictionary,
+        {
+          direction: "term_to_physical",
+          input: text,
+          convertedText: target,
+          confidence: "exact",
+          matches: [
+            {
+              source: text,
+              target,
+              type: "attribute",
+              components: exact.components
+            }
+          ],
+          candidates: [],
+          unmatched: [],
+          warnings: []
+        },
+        exact.physical
+      ),
       maxCandidates
     );
   }
 
   const composed = composeTermToPhysical(dictionary, text, input, maxCandidates);
   if (composed) {
-    return withReverseCheck(dictionary, composed, maxCandidates);
+    return withReverseCheck(dictionary, withPhysicalDomainSuffixWarning(dictionary, composed), maxCandidates);
   }
 
-  return withReverseCheck(dictionary, scanKoreanText(dictionary, text, input, maxCandidates), maxCandidates);
+  return withReverseCheck(
+    dictionary,
+    withPhysicalDomainSuffixWarning(dictionary, scanKoreanText(dictionary, text, input, maxCandidates)),
+    maxCandidates
+  );
 }
 
 function convertPhysicalToTerm(
@@ -199,67 +207,112 @@ function convertPhysicalToTerm(
   const normalized = camelToSnakePhysical(text);
   const exact = dictionary.attributeByPhysical.get(normalized);
   if (exact) {
-    return {
-      direction: "physical_to_term",
-      input: text,
-      convertedText: exact.term,
-      confidence: "exact",
-      matches: [
-        {
-          source: text,
-          target: exact.term,
-          type: "attribute",
-          components: exact.components
-        }
-      ],
-      candidates: [],
-      unmatched: [],
-      warnings: []
-    };
+    return withPhysicalDomainSuffixWarning(
+      dictionary,
+      {
+        direction: "physical_to_term",
+        input: text,
+        convertedText: exact.term,
+        confidence: "exact",
+        matches: [
+          {
+            source: text,
+            target: exact.term,
+            type: "attribute",
+            components: exact.components
+          }
+        ],
+        candidates: [],
+        unmatched: [],
+        warnings: []
+      },
+      normalized
+    );
   }
 
   const composed = composePhysicalTokensToTerm(dictionary, normalized, maxCandidates);
 
   if (composed.confidence === "composed") {
-    return {
+    return withPhysicalDomainSuffixWarning(
+      dictionary,
+      {
+        direction: "physical_to_term",
+        input: text,
+        convertedText: composed.convertedText,
+        confidence: "composed",
+        matches: [
+          {
+            source: text,
+            target: composed.convertedText,
+            type: "attribute",
+            components: composed.components
+          }
+        ],
+        candidates: composed.candidates,
+        unmatched: composed.unmatched,
+        warnings: composed.warnings
+      },
+      normalized
+    );
+  }
+
+  return withPhysicalDomainSuffixWarning(
+    dictionary,
+    {
       direction: "physical_to_term",
       input: text,
-      convertedText: composed.convertedText,
-      confidence: "composed",
-      matches: [
-        {
-          source: text,
-          target: composed.convertedText,
-          type: "attribute",
-          components: composed.components
-        }
-      ],
+      convertedText: composed.convertedText || text,
+      confidence: composed.confidence,
+      matches:
+        composed.components.length > 0
+          ? [
+              {
+                source: text,
+                target: composed.convertedText,
+                type: "attribute",
+                components: composed.components
+              }
+            ]
+          : [],
       candidates: composed.candidates,
       unmatched: composed.unmatched,
       warnings: composed.warnings
-    };
+    },
+    normalized
+  );
+}
+
+function withPhysicalDomainSuffixWarning(
+  dictionary: TermDictionary,
+  result: ConvertTermsOutput,
+  physicalName = result.convertedText
+): ConvertTermsOutput {
+  const warning = getPhysicalDomainSuffixWarning(dictionary, physicalName);
+  if (!warning || result.warnings.includes(warning)) {
+    return result;
   }
 
   return {
-    direction: "physical_to_term",
-    input: text,
-    convertedText: composed.convertedText || text,
-    confidence: composed.confidence,
-    matches:
-      composed.components.length > 0
-        ? [
-            {
-              source: text,
-              target: composed.convertedText,
-              type: "attribute",
-              components: composed.components
-            }
-          ]
-        : [],
-    candidates: composed.candidates,
-    unmatched: composed.unmatched,
-    warnings: composed.warnings
+    ...result,
+    warnings: [...result.warnings, warning]
   };
+}
+
+function getPhysicalDomainSuffixWarning(
+  dictionary: TermDictionary,
+  physicalName: string
+): string | undefined {
+  if (!/[A-Za-z0-9_]/.test(physicalName)) {
+    return undefined;
+  }
+
+  const normalized = camelToSnakePhysical(physicalName);
+  const lastToken = splitPhysicalName(normalized).at(-1);
+  if (!lastToken || dictionary.domainPhysicalToTerms.has(lastToken)) {
+    return undefined;
+  }
+
+  return `Physical name ${normalized} does not end with a registered domain token.`;
 }
 
 function withReverseCheck(

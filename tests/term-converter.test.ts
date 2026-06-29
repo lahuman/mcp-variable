@@ -661,6 +661,51 @@ describe("term conversion", () => {
     });
   });
 
+  test("warns when converted physical names do not end with a domain token", () => {
+    const dictionary = buildDictionary([
+      {
+        termName: "사례내용",
+        physicalName: "CASE_CN",
+        domainType: "내용",
+        domain: "내용V4000",
+        dataType: "VARCHAR(4000)"
+      },
+      {
+        termName: "우수사례내용",
+        physicalName: "EXLN_CASE_CN",
+        domainType: "내용",
+        domain: "내용V4000",
+        dataType: "VARCHAR(4000)"
+      }
+    ]);
+
+    const termResult = convertTerms(dictionary, {
+      text: "우수사례",
+      direction: "term_to_physical",
+      outputCase: "snake"
+    });
+    const physicalResult = convertTerms(dictionary, {
+      text: "EXLN_CASE",
+      direction: "physical_to_term"
+    });
+
+    expect(termResult).toMatchObject({
+      convertedText: "EXLN_CASE",
+      confidence: "partial"
+    });
+    expect(termResult.warnings).toContain(
+      "Physical name EXLN_CASE does not end with a registered domain token."
+    );
+    expect(physicalResult).toMatchObject({
+      convertedText: "우수",
+      confidence: "partial",
+      unmatched: ["CASE"]
+    });
+    expect(physicalResult.warnings).toContain(
+      "Physical name EXLN_CASE does not end with a registered domain token."
+    );
+  });
+
   test("applies lowerCamel and UpperCamel output cases", () => {
     const dictionary = buildDictionary(rows);
 
