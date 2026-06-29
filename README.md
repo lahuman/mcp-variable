@@ -81,7 +81,7 @@ CSV 경로 우선순위:
 
 ## MCP 설정 예시
 
-빌드 후 MCP 클라이언트 설정에 다음처럼 등록합니다.
+빌드 후 로컬 `stdio` MCP 클라이언트 설정에 다음처럼 등록합니다.
 
 ```json
 {
@@ -93,6 +93,25 @@ CSV 경로 우선순위:
         "--csv",
         "/Users/k/DEV/mcp-variable/data/terms.csv"
       ]
+    }
+  }
+}
+```
+
+SSE 서버를 별도 프로세스로 먼저 실행하는 경우:
+
+```bash
+npm run start:sse -- --csv ./data/terms.csv --host 127.0.0.1 --port 3000
+```
+
+URL 기반 MCP 연결을 지원하는 클라이언트의 `mcp.json`에는 다음처럼 등록합니다.
+
+```json
+{
+  "mcpServers": {
+    "mcp-variable-sse": {
+      "type": "sse",
+      "url": "http://127.0.0.1:3000/sse"
     }
   }
 }
