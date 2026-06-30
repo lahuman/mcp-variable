@@ -1,7 +1,7 @@
 interface:
   display_name: "Gemini MCP Variable Naming"
   short_description: "Use mcp-variable in Gemini/Antigravity for dictionary search and standard names"
-  default_prompt: "Use $mcp-variable-naming in Gemini/Antigravity: follow AGENTS_INIT.md, call search_terms to inspect registered dictionary rows when needed, and call convert_terms before generating standard variable names."
+  default_prompt: "Use $mcp-variable-naming in Gemini/Antigravity: follow the target project's AGENTS.md or AGENT.md instructions, call search_terms to inspect registered dictionary rows when needed, and call convert_terms before generating standard variable names."
 
 dependencies:
   tools:

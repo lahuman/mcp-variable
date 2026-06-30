@@ -181,6 +181,7 @@ describe("dictionary building", () => {
     expect(dictionary.domainTermToPhysical.get("성명")).toEqual(new Set(["FLNM"]));
     expect(dictionary.physicalToTerms.has("TTL")).toBe(false);
     expect(dictionary.physicalToTerms.has("FLNM")).toBe(false);
+    expect(dictionary.termToPhysical.has("한자성")).toBe(false);
     expect(dictionary.attributeByTerm.get("문서제목")?.components).toEqual([
       { term: "문서", physical: "DOC", role: "word" },
       { term: "제목", physical: "TTL", role: "domain" }
@@ -211,6 +212,59 @@ describe("dictionary building", () => {
     expect(dictionary.warnings).toContain(
       "Could not verify word segmentation for 라우팅결과값 -> ROTNG_RSLT_VAL"
     );
+  });
+
+  test("prunes domain-type stem seeds that are not used by verified attribute components", () => {
+    const dictionary = buildDictionary([
+      {
+        termName: "점수",
+        physicalName: "SCR",
+        domainType: "수",
+        domain: "수N10,3",
+        dataType: "NUMBER(10,3)"
+      },
+      {
+        termName: "비율",
+        physicalName: "RT",
+        domainType: "율",
+        domain: "율N5,2",
+        dataType: "NUMBER(5,2)"
+      },
+      {
+        termName: "가중치점수",
+        physicalName: "WGVL_SCR",
+        domainType: "수",
+        domain: "수N10,3",
+        dataType: "NUMBER(10,3)"
+      },
+      {
+        termName: "가중치비율",
+        physicalName: "WGVL_RT",
+        domainType: "율",
+        domain: "율N5,2",
+        dataType: "NUMBER(5,2)"
+      }
+    ]);
+
+    expect(dictionary.termToPhysical.get("가중치")).toEqual(new Set(["WGVL"]));
+    expect(dictionary.termToPhysical.has("가중치점")).toBe(false);
+    expect(dictionary.termToPhysical.has("가중치비")).toBe(false);
+    expect(dictionary.attributeByTerm.get("가중치비율")?.components).toEqual([
+      { term: "가중치", physical: "WGVL", role: "word" },
+      { term: "비율", physical: "RT", role: "domain" }
+    ]);
+
+    const result = convertTerms(dictionary, {
+      text: "가중치비명",
+      direction: "term_to_physical",
+      outputCase: "snake"
+    });
+
+    expect(result).toMatchObject({
+      confidence: "partial",
+      unmatched: ["비"]
+    });
+    expect(result.convertedText).not.toBe("WGVL_NM");
   });
 
   test("infers one missing word token when surrounding mappings verify segmentation", () => {

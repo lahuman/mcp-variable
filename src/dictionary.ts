@@ -54,6 +54,7 @@ export function buildDictionary(rows: TermRow[]): TermDictionary {
 
   applyForcedDomainMappings(dictionary);
 
+  const attributeEntries: AttributeEntry[] = [];
   for (const row of rows) {
     const physical = normalizePhysicalName(row.physicalName);
     const components = buildComponents(row, dictionary);
@@ -63,6 +64,7 @@ export function buildDictionary(rows: TermRow[]): TermDictionary {
       row: { ...row, physicalName: physical },
       components
     };
+    attributeEntries.push(entry);
 
     if (!dictionary.attributeByTerm.has(row.termName)) {
       dictionary.attributeByTerm.set(row.termName, entry);
@@ -71,6 +73,8 @@ export function buildDictionary(rows: TermRow[]): TermDictionary {
       dictionary.attributeByPhysical.set(physical, entry);
     }
   }
+
+  pruneWordMappingsToVerifiedComponents(dictionary, attributeEntries);
 
   return dictionary;
 }
@@ -123,6 +127,28 @@ function addWordMapping(dictionary: TermDictionary, term: string, physical: stri
   const addedTerm = addMapping(dictionary.termToPhysical, term, physical);
   const addedPhysical = addMapping(dictionary.physicalToTerms, physical, term);
   return addedTerm || addedPhysical;
+}
+
+function pruneWordMappingsToVerifiedComponents(
+  dictionary: TermDictionary,
+  entries: AttributeEntry[]
+): void {
+  const termToPhysical = new Map<string, Set<string>>();
+  const physicalToTerms = new Map<string, Set<string>>();
+
+  for (const entry of entries) {
+    for (const component of entry.components) {
+      if (component.role !== "word") {
+        continue;
+      }
+
+      addMapping(termToPhysical, component.term, component.physical);
+      addMapping(physicalToTerms, component.physical, component.term);
+    }
+  }
+
+  dictionary.termToPhysical = termToPhysical;
+  dictionary.physicalToTerms = physicalToTerms;
 }
 
 function hasShorterCandidateForPhysical(

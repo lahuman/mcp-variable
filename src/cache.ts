@@ -7,7 +7,7 @@ import { buildDictionary } from "./dictionary.js";
 import type { AttributeEntry, TermDictionary, TermRow } from "./types.js";
 
 const CACHE_VERSION = 1;
-const DICTIONARY_ALGORITHM_VERSION = 2;
+const DICTIONARY_ALGORITHM_VERSION = 3;
 
 export type DictionaryCacheSource = {
   sha256: string;

@@ -9,7 +9,7 @@ description: Use when Gemini, Antigravity, or another AI coding agent must searc
 
 In Gemini/Antigravity coding sessions, use the `mcp-variable` MCP server as the source of truth for business variable names. Do not invent names from memory, web search, or generic translation when a name is based on a domain term.
 
-If the agent session does not automatically load repository instructions, paste or attach `AGENTS_INIT.md` before asking for variable names.
+When using this skill in another project, read that project's agent instructions first. Prefer `AGENTS.md`; if the project uses the singular name, read `AGENT.md` instead.
 
 ## Required Workflow
 
@@ -115,7 +115,7 @@ Then apply only the resolved names in code. If unresolved names block the implem
 
 If the `mcp-variable` MCP server, `search_terms`, or `convert_terms` tool is not available:
 
-1. Check the project instructions in `AGENTS.md` for the configured server command.
+1. Check the project instructions in `AGENTS.md` or `AGENT.md` for the configured server command.
 2. In Gemini/Antigravity, verify that the `mcp-variable` MCP server is enabled in the client MCP configuration.
 3. Tell the user that standard naming cannot be verified until the MCP server is enabled.
 4. Do not replace MCP lookup with web search or generic translation.
