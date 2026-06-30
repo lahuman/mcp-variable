@@ -155,6 +155,43 @@ describe("SSE server options", () => {
 });
 
 describe("SSE MCP server", () => {
+  test("serves a public index guide without exposing configured API keys", async () => {
+    const server = createSseHttpServer(
+      createTestOptions({
+        csvPath: await writeTestCsv("index"),
+        apiKeys: ["variable-mcp-with-dataportal"]
+      })
+    );
+    activeServers.push(server);
+
+    await server.listen();
+    const baseUrl = serverBaseUrl(server);
+
+    const index = await textResponse(`${baseUrl}/index.html`);
+    expect(index.status).toBe(200);
+    expect(index.headers.get("content-type")).toContain("text/html");
+    expect(index.body).toContain("mcp-variable");
+    expect(index.body).toContain("/health");
+    expect(index.body).toContain("/sse");
+    expect(index.body).toContain("/messages");
+    expect(index.body).toContain("Authorization: Bearer &lt;api-key&gt;");
+    expect(index.body).toContain("X-API-Key: &lt;api-key&gt;");
+    expect(index.body).not.toContain("variable-mcp-with-dataportal");
+
+    const root = await textResponse(`${baseUrl}/`);
+    expect(root.status).toBe(200);
+    expect(root.body).toContain("mcp-variable");
+    expect(root.body).not.toContain("variable-mcp-with-dataportal");
+
+    const escaped = await textResponse(`${baseUrl}/index.html`, {
+      headers: {
+        "X-Forwarded-Proto": 'https"><script>alert(1)</script>'
+      }
+    });
+    expect(escaped.status).toBe(200);
+    expect(escaped.body).not.toContain("<script>alert(1)</script>");
+  });
+
   test("serves the registered MCP tools over HTTP plus SSE", async () => {
     const csvPath = await writeTestCsv("sse");
 

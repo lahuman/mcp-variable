@@ -92,6 +92,7 @@ Docker Compose v1 환경에서는 같은 파일로 `docker-compose up -d --build
 
 기본 설정:
 
+- 가이드 페이지: `GET http://127.0.0.1:3000/index.html` 또는 `GET http://127.0.0.1:3000/`
 - 공개 URL: `http://127.0.0.1:3000/sse`
 - health check: `GET http://127.0.0.1:3000/health`
 - 메시지 POST 엔드포인트: `/messages`
@@ -125,6 +126,12 @@ MCP_VARIABLE_CSV_SOURCE=/absolute/path/to/terms.csv
 - `MCP_VARIABLE_RATE_LIMIT_WINDOW_MS`: rate limit 집계 시간 창입니다.
 - `MCP_VARIABLE_RATE_LIMIT_MAX`: 시간 창 안에서 클라이언트별로 허용할 `/sse`, `/messages` 요청 수입니다.
 
+현재 배포에서 사용할 API 키를 서버에 설정하려면 `.env`에 다음처럼 넣습니다.
+
+```dotenv
+MCP_VARIABLE_API_KEYS=variable-mcp-with-dataportal
+```
+
 API 키를 설정한 경우 클라이언트는 다음 중 하나의 헤더를 보내야 합니다.
 
 ```http
@@ -132,7 +139,7 @@ Authorization: Bearer <api-key>
 X-API-Key: <api-key>
 ```
 
-키를 URL query string에 넣는 방식은 로그와 공유 URL에 노출되기 쉬워 지원하지 않습니다.
+`/index.html` 가이드 페이지에는 실제 키를 표시하지 않습니다. 키를 URL query string에 넣는 방식은 로그와 공유 URL에 노출되기 쉬워 지원하지 않습니다.
 
 상태 확인과 종료:
 
