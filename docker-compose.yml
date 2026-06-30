@@ -1,0 +1,28 @@
+services:
+  mcp-variable-sse:
+    build:
+      context: .
+      target: runtime
+    image: mcp-variable-sse:latest
+    container_name: mcp-variable-sse
+    restart: unless-stopped
+    ports:
+      - "${MCP_VARIABLE_PORT:-3000}:${MCP_VARIABLE_PORT:-3000}"
+    environment:
+      MCP_VARIABLE_HOST: 0.0.0.0
+      MCP_VARIABLE_PORT: "${MCP_VARIABLE_PORT:-3000}"
+      MCP_VARIABLE_CSV: /app/data/terms.csv
+      MCP_VARIABLE_SSE_PATH: "${MCP_VARIABLE_SSE_PATH:-/sse}"
+      MCP_VARIABLE_MESSAGES_PATH: "${MCP_VARIABLE_MESSAGES_PATH:-/messages}"
+    volumes:
+      - "${MCP_VARIABLE_CSV_SOURCE:-./data/terms.csv}:/app/data/terms.csv:ro"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"const port = process.env.MCP_VARIABLE_PORT || '3000'; fetch('http://127.0.0.1:' + port + '/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1));\""
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

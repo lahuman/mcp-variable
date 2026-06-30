@@ -79,6 +79,48 @@ CSV 경로 우선순위:
 2. `MCP_VARIABLE_CSV`
 3. `./data/terms.csv`
 
+## Docker Compose로 SSE 서버 배포
+
+SSE 서버를 컨테이너로 빌드하고 백그라운드 실행할 때는 다음 명령을 사용합니다.
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+Docker Compose v1 환경에서는 같은 파일로 `docker-compose up -d --build`를 사용할 수 있습니다.
+
+기본 설정:
+
+- 공개 URL: `http://127.0.0.1:3000/sse`
+- health check: `GET http://127.0.0.1:3000/health`
+- 메시지 POST 엔드포인트: `/messages`
+- 사전 파일: 호스트의 `./data/terms.csv`를 컨테이너의 `/app/data/terms.csv`로 읽기 전용 마운트
+
+`.env`에서 다음 값을 바꿀 수 있습니다.
+
+```dotenv
+MCP_VARIABLE_PORT=3000
+MCP_VARIABLE_SSE_PATH=/sse
+MCP_VARIABLE_MESSAGES_PATH=/messages
+MCP_VARIABLE_CSV_SOURCE=./data/terms.csv
+```
+
+다른 사전 파일을 사용하려면 `MCP_VARIABLE_CSV_SOURCE`에 호스트 기준 CSV 경로를 지정합니다.
+
+```dotenv
+MCP_VARIABLE_CSV_SOURCE=/absolute/path/to/terms.csv
+```
+
+상태 확인과 종료:
+
+```bash
+docker compose ps
+docker compose logs -f mcp-variable-sse
+curl http://127.0.0.1:3000/health
+docker compose down
+```
+
 ## MCP 설정 예시
 
 빌드 후 로컬 `stdio` MCP 클라이언트 설정에 다음처럼 등록합니다.
