@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -166,10 +166,12 @@ describe("SSE MCP server", () => {
 
     await server.listen();
     const baseUrl = serverBaseUrl(server);
+    const guideHtml = await readFile(join(process.cwd(), "public", "index.html"), "utf8");
 
     const index = await textResponse(`${baseUrl}/index.html`);
     expect(index.status).toBe(200);
     expect(index.headers.get("content-type")).toContain("text/html");
+    expect(index.body).toBe(guideHtml);
     expect(index.body).toContain("mcp-variable");
     expect(index.body).toContain("/health");
     expect(index.body).toContain("/sse");
@@ -180,6 +182,7 @@ describe("SSE MCP server", () => {
 
     const root = await textResponse(`${baseUrl}/`);
     expect(root.status).toBe(200);
+    expect(root.body).toBe(guideHtml);
     expect(root.body).toContain("mcp-variable");
     expect(root.body).not.toContain("variable-mcp-with-dataportal");
 

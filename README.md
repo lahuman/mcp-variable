@@ -96,6 +96,7 @@ Docker Compose v1 환경에서는 같은 파일로 `docker-compose up -d --build
 - 공개 URL: `http://127.0.0.1:3000/sse`
 - health check: `GET http://127.0.0.1:3000/health`
 - 메시지 POST 엔드포인트: `/messages`
+- 가이드 파일: `public/index.html`
 - 사전 파일: 호스트의 `./data/terms.csv`를 컨테이너의 `/app/data/terms.csv`로 읽기 전용 마운트
 
 `.env`에서 다음 값을 바꿀 수 있습니다.

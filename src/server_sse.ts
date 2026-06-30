@@ -7,7 +7,9 @@ import {
   type ServerResponse
 } from "node:http";
 import { timingSafeEqual } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
+import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -63,6 +65,7 @@ const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000;
 const DEFAULT_RATE_LIMIT_MAX = 120;
 const CORS_ALLOWED_METHODS = "GET, POST, OPTIONS";
 const CORS_ALLOWED_HEADERS = "Authorization, X-API-Key, Content-Type, MCP-Protocol-Version";
+const INDEX_HTML_PATH = join(process.cwd(), "public", "index.html");
 
 const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
@@ -345,204 +348,8 @@ function rejectRateLimitedRequest(
   };
 }
 
-function getPublicOrigin(req: IncomingMessage): string {
-  const forwardedProto = getHeaderValue(req, "x-forwarded-proto")
-    ?.split(",")[0]
-    ?.trim();
-  const protocol = forwardedProto === "http" || forwardedProto === "https" ? forwardedProto : "http";
-  const host = req.headers.host ?? "127.0.0.1";
-  return `${protocol}://${host}`;
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (character) => {
-    switch (character) {
-      case "&":
-        return "&amp;";
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case '"':
-        return "&quot;";
-      case "'":
-        return "&#39;";
-      default:
-        return character;
-    }
-  });
-}
-
-function createIndexHtml(req: IncomingMessage, options: SseServerOptions): string {
-  const origin = getPublicOrigin(req);
-  const sseUrl = `${origin}${options.ssePath}`;
-  const displayOrigin = escapeHtml(origin);
-  const displaySseUrl = escapeHtml(sseUrl);
-  const displaySsePath = escapeHtml(options.ssePath);
-  const displayMessagesPath = escapeHtml(options.messagesPath);
-
-  return `<!doctype html>
-<html lang="ko">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>mcp-variable SSE Guide</title>
-  <style>
-    :root {
-      color-scheme: light;
-      --bg: #f7f8fb;
-      --panel: #ffffff;
-      --text: #172033;
-      --muted: #596579;
-      --line: #d9dee8;
-      --accent: #0f766e;
-      --code: #111827;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.55;
-    }
-    main {
-      width: min(960px, calc(100% - 32px));
-      margin: 0 auto;
-      padding: 40px 0 56px;
-    }
-    header {
-      border-bottom: 1px solid var(--line);
-      padding-bottom: 24px;
-      margin-bottom: 24px;
-    }
-    h1 {
-      margin: 0 0 10px;
-      font-size: 36px;
-      line-height: 1.15;
-      letter-spacing: 0;
-    }
-    h2 {
-      margin: 32px 0 12px;
-      font-size: 22px;
-      letter-spacing: 0;
-    }
-    p { margin: 0 0 12px; }
-    ul { padding-left: 22px; }
-    li { margin: 7px 0; }
-    code {
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      background: #eef2f7;
-      padding: 1px 5px;
-      font-family: "SFMono-Regular", Consolas, monospace;
-      font-size: 0.95em;
-    }
-    pre {
-      margin: 12px 0;
-      overflow-x: auto;
-      border-radius: 6px;
-      background: var(--code);
-      color: #f9fafb;
-      padding: 16px;
-      font-size: 14px;
-      line-height: 1.45;
-    }
-    pre code {
-      border: 0;
-      background: transparent;
-      color: inherit;
-      padding: 0;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 12px;
-      margin: 16px 0 8px;
-    }
-    .endpoint {
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: var(--panel);
-      padding: 14px;
-    }
-    .endpoint strong {
-      display: block;
-      color: var(--accent);
-      margin-bottom: 4px;
-    }
-    .note {
-      border-left: 4px solid var(--accent);
-      background: #eefbf8;
-      padding: 12px 14px;
-      margin: 16px 0;
-    }
-    @media (max-width: 560px) {
-      main { width: min(100% - 24px, 960px); padding-top: 28px; }
-      h1 { font-size: 30px; }
-    }
-  </style>
-</head>
-<body>
-  <main>
-    <header>
-      <h1>mcp-variable</h1>
-      <p>공공데이터 공통표준용어 사전을 기반으로 한국어 업무 용어와 물리명, 코드 변수명을 변환하는 로컬/HTTP SSE MCP 서버입니다.</p>
-    </header>
-
-    <section>
-      <h2>엔드포인트</h2>
-      <div class="grid">
-        <div class="endpoint"><strong>GET /index.html</strong><span>프로젝트 설명과 연결 가이드</span></div>
-        <div class="endpoint"><strong>GET /health</strong><span>서버 상태 확인</span></div>
-        <div class="endpoint"><strong>GET ${displaySsePath}</strong><span>MCP SSE 수신 스트림</span></div>
-        <div class="endpoint"><strong>POST ${displayMessagesPath}</strong><span>MCP JSON-RPC 메시지 전송</span></div>
-      </div>
-    </section>
-
-    <section>
-      <h2>MCP 클라이언트 설정</h2>
-      <p>URL 기반 SSE MCP 연결을 지원하는 클라이언트에서는 다음처럼 등록합니다.</p>
-      <pre><code>{
-  "mcpServers": {
-    "mcp-variable-sse": {
-      "type": "sse",
-      "url": "${displaySseUrl}",
-      "headers": {
-        "Authorization": "Bearer &lt;api-key&gt;"
-      }
-    }
-  }
-}</code></pre>
-    </section>
-
-    <section>
-      <h2>API 키 사용</h2>
-      <p>API 키가 설정된 서버에서는 아래 헤더 중 하나를 보내야 합니다.</p>
-      <pre><code>Authorization: Bearer &lt;api-key&gt;
-X-API-Key: &lt;api-key&gt;</code></pre>
-      <div class="note">실제 키는 서버의 <code>MCP_VARIABLE_API_KEYS</code> 환경변수로만 설정하고, 공개 페이지나 URL query string에 노출하지 마세요.</div>
-    </section>
-
-    <section>
-      <h2>제공 도구</h2>
-      <ul>
-        <li><code>convert_terms</code>: 한국어 업무 용어를 물리명/변수명으로, 또는 물리명을 한국어 용어로 변환합니다.</li>
-        <li><code>search_terms</code>: CSV 사전에 등록된 용어 행을 검색합니다.</li>
-      </ul>
-      <pre><code>입력: 등록일자
-출력: regYmd
-confidence: exact</code></pre>
-    </section>
-
-    <section>
-      <h2>직접 점검</h2>
-      <pre><code>curl ${displayOrigin}/health
-curl -N -H "Authorization: Bearer &lt;api-key&gt;" ${displaySseUrl}</code></pre>
-    </section>
-  </main>
-</body>
-</html>`;
+async function readIndexHtml(): Promise<string> {
+  return readFile(INDEX_HTML_PATH, "utf8");
 }
 
 export function createSseRequestHandler(
@@ -573,7 +380,12 @@ async function handleSseRequest(
   const corsHeaders = getCorsHeaders(req, options);
 
   if (req.method === "GET" && (requestPath === "/" || requestPath === "/index.html")) {
-    sendHtml(res, 200, createIndexHtml(req, options));
+    try {
+      sendHtml(res, 200, await readIndexHtml());
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : error);
+      sendText(res, 500, "Index page unavailable");
+    }
     return;
   }
 
