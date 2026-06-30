@@ -92,9 +92,11 @@ Docker Compose v1 환경에서는 같은 파일로 `docker-compose up -d --build
 
 기본 설정:
 
+- 가이드 페이지: `GET http://127.0.0.1:3000/index.html` 또는 `GET http://127.0.0.1:3000/`
 - 공개 URL: `http://127.0.0.1:3000/sse`
 - health check: `GET http://127.0.0.1:3000/health`
 - 메시지 POST 엔드포인트: `/messages`
+- 가이드 파일: `public/index.html`
 - 사전 파일: 호스트의 `./data/terms.csv`를 컨테이너의 `/app/data/terms.csv`로 읽기 전용 마운트
 
 `.env`에서 다음 값을 바꿀 수 있습니다.
@@ -104,6 +106,11 @@ MCP_VARIABLE_PORT=3000
 MCP_VARIABLE_SSE_PATH=/sse
 MCP_VARIABLE_MESSAGES_PATH=/messages
 MCP_VARIABLE_CSV_SOURCE=./data/terms.csv
+MCP_VARIABLE_API_KEYS=
+MCP_VARIABLE_ALLOWED_ORIGINS=
+MCP_VARIABLE_MAX_SESSIONS=100
+MCP_VARIABLE_RATE_LIMIT_WINDOW_MS=60000
+MCP_VARIABLE_RATE_LIMIT_MAX=120
 ```
 
 다른 사전 파일을 사용하려면 `MCP_VARIABLE_CSV_SOURCE`에 호스트 기준 CSV 경로를 지정합니다.
@@ -111,6 +118,29 @@ MCP_VARIABLE_CSV_SOURCE=./data/terms.csv
 ```dotenv
 MCP_VARIABLE_CSV_SOURCE=/absolute/path/to/terms.csv
 ```
+
+공개 SSE 서버는 필요에 따라 앱 레벨 보안을 켤 수 있습니다.
+
+- `MCP_VARIABLE_API_KEYS`: 쉼표로 구분한 API 키 목록입니다. 비워두면 기존처럼 인증 없이 동작합니다.
+- `MCP_VARIABLE_ALLOWED_ORIGINS`: 브라우저 클라이언트용 CORS 허용 origin 목록입니다. 비워두면 CORS 응답을 내지 않습니다.
+- `MCP_VARIABLE_MAX_SESSIONS`: 동시에 열 수 있는 SSE 세션 수입니다.
+- `MCP_VARIABLE_RATE_LIMIT_WINDOW_MS`: rate limit 집계 시간 창입니다.
+- `MCP_VARIABLE_RATE_LIMIT_MAX`: 시간 창 안에서 클라이언트별로 허용할 `/sse`, `/messages` 요청 수입니다.
+
+현재 배포에서 사용할 API 키를 서버에 설정하려면 `.env`에 다음처럼 넣습니다.
+
+```dotenv
+MCP_VARIABLE_API_KEYS=variable-mcp-with-dataportal
+```
+
+API 키를 설정한 경우 클라이언트는 다음 중 하나의 헤더를 보내야 합니다.
+
+```http
+Authorization: Bearer <api-key>
+X-API-Key: <api-key>
+```
+
+`/index.html` 가이드 페이지에는 실제 키를 표시하지 않습니다. 키를 URL query string에 넣는 방식은 로그와 공유 URL에 노출되기 쉬워 지원하지 않습니다.
 
 상태 확인과 종료:
 

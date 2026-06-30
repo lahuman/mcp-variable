@@ -6,7 +6,10 @@ import {
   type Server as HttpServer,
   type ServerResponse
 } from "node:http";
+import { timingSafeEqual } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
+import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -22,6 +25,11 @@ export type SseServerOptions = {
   port: number;
   ssePath: string;
   messagesPath: string;
+  apiKeys: string[];
+  allowedOrigins: string[];
+  maxSessions: number;
+  rateLimitWindowMs: number;
+  rateLimitMax: number;
 };
 
 export type SseHttpServer = {
@@ -37,10 +45,32 @@ type SseSession = {
   mcpServer: McpServer;
 };
 
+type RateLimitEntry = {
+  windowStart: number;
+  count: number;
+};
+
+type RequestRejection = {
+  statusCode: number;
+  message: string;
+  headers?: Record<string, string>;
+};
+
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 3000;
 const DEFAULT_SSE_PATH = "/sse";
 const DEFAULT_MESSAGES_PATH = "/messages";
+const DEFAULT_MAX_SESSIONS = 100;
+const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000;
+const DEFAULT_RATE_LIMIT_MAX = 120;
+const CORS_ALLOWED_METHODS = "GET, POST, OPTIONS";
+const CORS_ALLOWED_HEADERS = "Authorization, X-API-Key, Content-Type, MCP-Protocol-Version";
+const INDEX_HTML_PATH = join(process.cwd(), "public", "index.html");
+
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "no-referrer"
+};
 
 function readFlag(args: string[], flag: string): string | undefined {
   const index = args.indexOf(flag);
@@ -61,6 +91,23 @@ function parsePort(value: string, source: string): number {
     throw new Error(`Invalid ${source}: ${value}. Expected an integer between 1 and 65535.`);
   }
   return port;
+}
+
+function parsePositiveInteger(value: string, source: string): number {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 1) {
+    throw new Error(`Invalid ${source}: ${value}. Expected a positive integer.`);
+  }
+  return number;
+}
+
+function parseCommaSeparatedList(value: string | undefined): string[] {
+  return (
+    value
+      ?.split(",")
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0) ?? []
+  );
 }
 
 function normalizeEndpointPath(path: string, source: string): string {
@@ -89,13 +136,30 @@ export function resolveSseServerOptions(
     readFlag(args, "--messages-path") ?? env.MCP_VARIABLE_MESSAGES_PATH ?? DEFAULT_MESSAGES_PATH,
     "--messages-path"
   );
+  const maxSessions = parsePositiveInteger(
+    env.MCP_VARIABLE_MAX_SESSIONS ?? String(DEFAULT_MAX_SESSIONS),
+    "MCP_VARIABLE_MAX_SESSIONS"
+  );
+  const rateLimitWindowMs = parsePositiveInteger(
+    env.MCP_VARIABLE_RATE_LIMIT_WINDOW_MS ?? String(DEFAULT_RATE_LIMIT_WINDOW_MS),
+    "MCP_VARIABLE_RATE_LIMIT_WINDOW_MS"
+  );
+  const rateLimitMax = parsePositiveInteger(
+    env.MCP_VARIABLE_RATE_LIMIT_MAX ?? String(DEFAULT_RATE_LIMIT_MAX),
+    "MCP_VARIABLE_RATE_LIMIT_MAX"
+  );
 
   return {
     csvPath: resolveCsvPath(args, env),
     host,
     port,
     ssePath,
-    messagesPath
+    messagesPath,
+    apiKeys: parseCommaSeparatedList(env.MCP_VARIABLE_API_KEYS),
+    allowedOrigins: parseCommaSeparatedList(env.MCP_VARIABLE_ALLOWED_ORIGINS),
+    maxSessions,
+    rateLimitWindowMs,
+    rateLimitMax
   };
 }
 
@@ -104,34 +168,197 @@ function getRequestUrl(req: IncomingMessage): URL {
   return new URL(req.url ?? "/", `http://${host}`);
 }
 
-function sendText(res: ServerResponse, statusCode: number, text: string): void {
+function sendText(
+  res: ServerResponse,
+  statusCode: number,
+  text: string,
+  headers: Record<string, string> = {}
+): void {
   if (res.headersSent) {
     return;
   }
 
   res.writeHead(statusCode, {
-    "Content-Type": "text/plain; charset=utf-8"
+    ...SECURITY_HEADERS,
+    "Cache-Control": "no-store",
+    "Content-Type": "text/plain; charset=utf-8",
+    ...headers
   });
   res.end(text);
 }
 
-function sendJson(res: ServerResponse, statusCode: number, payload: unknown): void {
+function sendJson(
+  res: ServerResponse,
+  statusCode: number,
+  payload: unknown,
+  headers: Record<string, string> = {}
+): void {
   if (res.headersSent) {
     return;
   }
 
   res.writeHead(statusCode, {
-    "Content-Type": "application/json; charset=utf-8"
+    ...SECURITY_HEADERS,
+    "Cache-Control": "no-store",
+    "Content-Type": "application/json; charset=utf-8",
+    ...headers
   });
   res.end(`${JSON.stringify(payload)}\n`);
 }
 
+function sendHtml(res: ServerResponse, statusCode: number, html: string): void {
+  if (res.headersSent) {
+    return;
+  }
+
+  res.writeHead(statusCode, {
+    ...SECURITY_HEADERS,
+    "Cache-Control": "no-store",
+    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    "Content-Type": "text/html; charset=utf-8"
+  });
+  res.end(html);
+}
+
+function sendNoContent(res: ServerResponse, headers: Record<string, string> = {}): void {
+  if (res.headersSent) {
+    return;
+  }
+
+  res.writeHead(204, {
+    ...SECURITY_HEADERS,
+    "Cache-Control": "no-store",
+    ...headers
+  });
+  res.end();
+}
+
+function getHeaderValue(req: IncomingMessage, headerName: string): string | undefined {
+  const headerValue = req.headers[headerName.toLowerCase()];
+  if (Array.isArray(headerValue)) {
+    return headerValue[0];
+  }
+  return headerValue;
+}
+
+function getRequestApiKey(req: IncomingMessage): string | undefined {
+  const authorization = getHeaderValue(req, "authorization");
+  if (authorization?.startsWith("Bearer ")) {
+    const token = authorization.slice("Bearer ".length).trim();
+    if (token) {
+      return token;
+    }
+  }
+
+  const apiKey = getHeaderValue(req, "x-api-key")?.trim();
+  return apiKey || undefined;
+}
+
+function safeStringEquals(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function rejectInvalidApiKey(req: IncomingMessage, options: SseServerOptions): RequestRejection | undefined {
+  if (options.apiKeys.length === 0) {
+    return undefined;
+  }
+
+  const requestApiKey = getRequestApiKey(req);
+  if (!requestApiKey) {
+    return {
+      statusCode: 401,
+      message: "Missing API key"
+    };
+  }
+
+  if (!options.apiKeys.some((apiKey) => safeStringEquals(requestApiKey, apiKey))) {
+    return {
+      statusCode: 403,
+      message: "Invalid API key"
+    };
+  }
+
+  return undefined;
+}
+
+function getCorsHeaders(req: IncomingMessage, options: SseServerOptions): Record<string, string> {
+  const origin = getHeaderValue(req, "origin");
+  if (!origin || !options.allowedOrigins.includes(origin)) {
+    return {};
+  }
+
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": CORS_ALLOWED_METHODS,
+    "Access-Control-Allow-Headers": CORS_ALLOWED_HEADERS,
+    Vary: "Origin"
+  };
+}
+
+function rejectInvalidOrigin(req: IncomingMessage, options: SseServerOptions): RequestRejection | undefined {
+  const origin = getHeaderValue(req, "origin");
+  if (!origin || options.allowedOrigins.length === 0 || options.allowedOrigins.includes(origin)) {
+    return undefined;
+  }
+
+  return {
+    statusCode: 403,
+    message: "Origin not allowed"
+  };
+}
+
+function getClientId(req: IncomingMessage): string {
+  const forwardedFor = getHeaderValue(req, "x-forwarded-for")
+    ?.split(",")[0]
+    ?.trim();
+  return forwardedFor || req.socket.remoteAddress || "unknown";
+}
+
+function rejectRateLimitedRequest(
+  req: IncomingMessage,
+  options: SseServerOptions,
+  rateLimits: Map<string, RateLimitEntry>,
+  now = Date.now()
+): RequestRejection | undefined {
+  const clientId = getClientId(req);
+  const entry = rateLimits.get(clientId);
+
+  if (!entry || now - entry.windowStart >= options.rateLimitWindowMs) {
+    rateLimits.set(clientId, {
+      windowStart: now,
+      count: 1
+    });
+    return undefined;
+  }
+
+  entry.count += 1;
+  if (entry.count <= options.rateLimitMax) {
+    return undefined;
+  }
+
+  const retryAfterSeconds = Math.max(1, Math.ceil((options.rateLimitWindowMs - (now - entry.windowStart)) / 1000));
+  return {
+    statusCode: 429,
+    message: "Too many requests",
+    headers: {
+      "Retry-After": String(retryAfterSeconds)
+    }
+  };
+}
+
+async function readIndexHtml(): Promise<string> {
+  return readFile(INDEX_HTML_PATH, "utf8");
+}
+
 export function createSseRequestHandler(
   options: SseServerOptions,
-  sessions = new Map<string, SseSession>()
+  sessions = new Map<string, SseSession>(),
+  rateLimits = new Map<string, RateLimitEntry>()
 ): RequestListener {
   return (req, res) => {
-    void handleSseRequest(req, res, options, sessions).catch((error: unknown) => {
+    void handleSseRequest(req, res, options, sessions, rateLimits).catch((error: unknown) => {
       console.error(error instanceof Error ? error.message : error);
       sendText(res, 500, "Internal server error");
     });
@@ -142,18 +369,67 @@ async function handleSseRequest(
   req: IncomingMessage,
   res: ServerResponse,
   options: SseServerOptions,
-  sessions: Map<string, SseSession>
+  sessions: Map<string, SseSession>,
+  rateLimits: Map<string, RateLimitEntry>
 ): Promise<void> {
   const requestUrl = getRequestUrl(req);
   const requestPath = requestUrl.pathname;
+  const isSsePath = requestPath === options.ssePath;
+  const isMessagesPath = requestPath === options.messagesPath;
+  const isMcpTransportPath = isSsePath || isMessagesPath;
+  const corsHeaders = getCorsHeaders(req, options);
 
-  if (req.method === "GET" && requestPath === options.ssePath) {
-    await establishSseSession(res, options, sessions);
+  if (req.method === "GET" && (requestPath === "/" || requestPath === "/index.html")) {
+    try {
+      sendHtml(res, 200, await readIndexHtml());
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : error);
+      sendText(res, 500, "Index page unavailable");
+    }
     return;
   }
 
-  if (req.method === "POST" && requestPath === options.messagesPath) {
-    await handlePostMessage(req, res, requestUrl, sessions);
+  if (req.method === "OPTIONS" && isMcpTransportPath && options.allowedOrigins.length > 0) {
+    const rejection = rejectInvalidOrigin(req, options);
+    if (rejection) {
+      sendText(res, rejection.statusCode, rejection.message);
+      return;
+    }
+
+    sendNoContent(res, corsHeaders);
+    return;
+  }
+
+  if (req.method === "GET" && isSsePath) {
+    const rejection =
+      rejectInvalidOrigin(req, options) ??
+      rejectRateLimitedRequest(req, options, rateLimits) ??
+      rejectInvalidApiKey(req, options);
+    if (rejection) {
+      sendText(res, rejection.statusCode, rejection.message, { ...corsHeaders, ...rejection.headers });
+      return;
+    }
+
+    if (sessions.size >= options.maxSessions) {
+      sendText(res, 503, "Too many active sessions", corsHeaders);
+      return;
+    }
+
+    await establishSseSession(res, options, sessions, corsHeaders);
+    return;
+  }
+
+  if (req.method === "POST" && isMessagesPath) {
+    const rejection =
+      rejectInvalidOrigin(req, options) ??
+      rejectRateLimitedRequest(req, options, rateLimits) ??
+      rejectInvalidApiKey(req, options);
+    if (rejection) {
+      sendText(res, rejection.statusCode, rejection.message, { ...corsHeaders, ...rejection.headers });
+      return;
+    }
+
+    await handlePostMessage(req, res, requestUrl, sessions, corsHeaders);
     return;
   }
 
@@ -167,7 +443,7 @@ async function handleSseRequest(
     return;
   }
 
-  if (requestPath === options.ssePath || requestPath === options.messagesPath) {
+  if (isMcpTransportPath) {
     sendText(res, 405, "Method not allowed");
     return;
   }
@@ -178,8 +454,17 @@ async function handleSseRequest(
 async function establishSseSession(
   res: ServerResponse,
   options: SseServerOptions,
-  sessions: Map<string, SseSession>
+  sessions: Map<string, SseSession>,
+  corsHeaders: Record<string, string>
 ): Promise<void> {
+  for (const [headerName, headerValue] of Object.entries({
+    ...SECURITY_HEADERS,
+    ...corsHeaders,
+    "X-Accel-Buffering": "no"
+  })) {
+    res.setHeader(headerName, headerValue);
+  }
+
   const transport = new SSEServerTransport(options.messagesPath, res);
   const mcpServer = createMcpServer(options.csvPath);
   const sessionId = transport.sessionId;
@@ -211,17 +496,26 @@ async function handlePostMessage(
   req: IncomingMessage,
   res: ServerResponse,
   requestUrl: URL,
-  sessions: Map<string, SseSession>
+  sessions: Map<string, SseSession>,
+  corsHeaders: Record<string, string>
 ): Promise<void> {
+  for (const [headerName, headerValue] of Object.entries({
+    ...SECURITY_HEADERS,
+    "Cache-Control": "no-store",
+    ...corsHeaders
+  })) {
+    res.setHeader(headerName, headerValue);
+  }
+
   const sessionId = requestUrl.searchParams.get("sessionId");
   if (!sessionId) {
-    sendText(res, 400, "Missing sessionId parameter");
+    sendText(res, 400, "Missing sessionId parameter", corsHeaders);
     return;
   }
 
   const session = sessions.get(sessionId);
   if (!session) {
-    sendText(res, 404, "Session not found");
+    sendText(res, 404, "Session not found", corsHeaders);
     return;
   }
 
