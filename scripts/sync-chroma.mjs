@@ -17,8 +17,9 @@ if (!Number.isInteger(batchSize) || batchSize < 1) {
   throw new Error(`Invalid MCP_VARIABLE_CHROMA_BATCH_SIZE: ${process.env.MCP_VARIABLE_CHROMA_BATCH_SIZE}`);
 }
 
-const [{ ChromaClient }, { loadCsvFile }, { buildDictionary }] = await Promise.all([
+const [{ ChromaClient }, { DefaultEmbeddingFunction }, { loadCsvFile }, { buildDictionary }] = await Promise.all([
   import("chromadb"),
+  import("@chroma-core/default-embed"),
   import("../dist/csvLoader.js"),
   import("../dist/dictionary.js")
 ]);
@@ -32,7 +33,8 @@ const client = new ChromaClient({
   ssl,
   database: process.env.MCP_VARIABLE_CHROMA_DATABASE
 });
-const collection = await getOrCreateCollection(client, collectionName);
+const embeddingFunction = new DefaultEmbeddingFunction();
+const collection = await getOrCreateCollection(client, collectionName, embeddingFunction);
 
 for (let index = 0; index < documents.length; index += batchSize) {
   const batch = documents.slice(index, index + batchSize);
@@ -59,11 +61,11 @@ console.log(
   )
 );
 
-async function getOrCreateCollection(client, name) {
+async function getOrCreateCollection(client, name, embeddingFunction) {
   try {
-    return await client.getCollection({ name });
+    return await client.getCollection({ name, embeddingFunction });
   } catch {
-    return client.createCollection({ name });
+    return client.createCollection({ name, embeddingFunction });
   }
 }
 

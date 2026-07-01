@@ -34,7 +34,7 @@ type ChromaCollection = {
 };
 
 type ChromaClient = {
-  getCollection(args: { name: string }): Promise<ChromaCollection>;
+  getCollection(args: { name: string; embeddingFunction?: unknown }): Promise<ChromaCollection>;
 };
 
 type ChromaModule = {
@@ -45,6 +45,10 @@ type ChromaModule = {
     database?: string;
     headers?: Record<string, string>;
   }) => ChromaClient;
+};
+
+type DefaultEmbedModule = {
+  DefaultEmbeddingFunction: new () => unknown;
 };
 
 export type SemanticSuggestionService = {
@@ -168,14 +172,21 @@ class ChromaSemanticSuggestionProvider implements SemanticSuggestionProvider {
 
   private async createCollection(): Promise<ChromaCollection> {
     const moduleName = "chromadb";
-    const chroma = (await import(moduleName)) as ChromaModule;
+    const defaultEmbedModuleName = "@chroma-core/default-embed";
+    const [chroma, defaultEmbed] = (await Promise.all([
+      import(moduleName),
+      import(defaultEmbedModuleName)
+    ])) as [ChromaModule, DefaultEmbedModule];
     const client = new chroma.ChromaClient({
       host: this.config.host,
       port: this.config.port,
       ssl: this.config.ssl,
       database: this.config.database
     });
-    return client.getCollection({ name: this.config.collectionName });
+    return client.getCollection({
+      name: this.config.collectionName,
+      embeddingFunction: new defaultEmbed.DefaultEmbeddingFunction()
+    });
   }
 }
 

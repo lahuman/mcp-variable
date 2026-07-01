@@ -7,7 +7,11 @@ await runNodeScript("scripts/prebuild-cache.mjs", [csvPath]);
 
 if (shouldSyncChroma()) {
   await waitForChroma();
-  await runNodeScript("scripts/sync-chroma.mjs", [csvPath]);
+  if (process.env.MCP_VARIABLE_CHROMA_SYNC_BLOCKING === "true") {
+    await runNodeScript("scripts/sync-chroma.mjs", [csvPath], { fatal: true });
+  } else {
+    void runNodeScript("scripts/sync-chroma.mjs", [csvPath], { fatal: false });
+  }
 }
 
 const server = spawn(process.execPath, ["dist/server_sse.js"], {
@@ -68,7 +72,7 @@ async function waitForChroma() {
   );
 }
 
-function runNodeScript(script, args) {
+function runNodeScript(script, args, options = { fatal: true }) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [script, ...args], {
       stdio: "inherit",
@@ -81,7 +85,13 @@ function runNodeScript(script, args) {
         resolve();
         return;
       }
-      reject(new Error(`${script} exited with ${signal ?? code}`));
+      const error = new Error(`${script} exited with ${signal ?? code}`);
+      if (options.fatal) {
+        reject(error);
+        return;
+      }
+      console.error(error.message);
+      resolve();
     });
   });
 }

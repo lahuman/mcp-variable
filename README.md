@@ -91,6 +91,7 @@ npm run cache:prebuild -- ./data/terms.csv
 
 `suggest_terms` 도구는 Chroma가 설정된 경우 비슷한 용어, 단어, 도메인을 추천합니다.
 이 결과는 후보 추천용이며 `convert_terms`의 `exact` 또는 `composed` confidence를 대체하지 않습니다.
+Node.js Chroma 클라이언트는 문서 embedding 생성을 위해 `chromadb`와 `@chroma-core/default-embed` 런타임 의존성을 사용합니다.
 
 Chroma 서버를 로컬 파일 DB로 실행하려면 Chroma 문서 기준으로 별도 서버를 띄운 뒤 이 MCP 서버가 HTTP 클라이언트로 연결합니다.
 
@@ -155,7 +156,7 @@ Docker Compose v1 환경에서는 같은 파일로 `docker-compose up -d --build
 - 가이드 파일: `public/index.html`
 - 사전 파일: 호스트의 `./data/terms.csv`를 컨테이너의 `/app/data/terms.csv`로 읽기 전용 마운트
 - Chroma 서버: Compose의 `chroma` 서비스가 `chromadb/chroma` 이미지로 실행됩니다.
-- 시작 처리: `mcp-variable-sse` 컨테이너가 캐시를 미리 만들고 Chroma 컬렉션을 동기화한 뒤 SSE 서버를 시작합니다.
+- 시작 처리: `mcp-variable-sse` 컨테이너가 캐시를 미리 만들고, 기본값에서는 Chroma 컬렉션 동기화를 백그라운드로 진행하면서 SSE 서버를 시작합니다.
 
 `.env`에서 다음 값을 바꿀 수 있습니다.
 
@@ -172,6 +173,7 @@ MCP_VARIABLE_RATE_LIMIT_MAX=120
 MCP_VARIABLE_CHROMA_PUBLISHED_PORT=8000
 MCP_VARIABLE_CHROMA_COLLECTION=mcp_variable_terms
 MCP_VARIABLE_CHROMA_SYNC_ON_START=true
+MCP_VARIABLE_CHROMA_SYNC_BLOCKING=false
 MCP_VARIABLE_CHROMA_STARTUP_TIMEOUT_MS=60000
 ```
 
@@ -191,6 +193,7 @@ MCP_VARIABLE_CSV_SOURCE=/absolute/path/to/terms.csv
 - `MCP_VARIABLE_CHROMA_PUBLISHED_PORT`: 호스트에서 Chroma에 접근할 포트입니다. 컨테이너 내부 SSE 서버는 항상 `chroma:8000`으로 연결합니다.
 - `MCP_VARIABLE_CHROMA_COLLECTION`: `suggest_terms`가 조회할 Chroma 컬렉션 이름입니다.
 - `MCP_VARIABLE_CHROMA_SYNC_ON_START`: `true`이면 SSE 서버 시작 전에 CSV 내용을 Chroma 컬렉션으로 동기화합니다.
+- `MCP_VARIABLE_CHROMA_SYNC_BLOCKING`: `false`이면 Chroma 동기화를 백그라운드로 실행하고 SSE 서버를 먼저 띄웁니다. `true`이면 동기화가 성공해야 SSE 서버를 시작합니다.
 - `MCP_VARIABLE_CHROMA_STARTUP_TIMEOUT_MS`: SSE 컨테이너가 Chroma 준비를 기다리는 최대 시간입니다.
 
 현재 배포에서 사용할 API 키를 서버에 설정하려면 `.env`에 다음처럼 넣습니다.

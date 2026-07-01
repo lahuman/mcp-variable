@@ -4,6 +4,15 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 
 describe("Docker Compose Chroma deployment", () => {
+  test("runtime dependencies include Chroma client and default embedding package", async () => {
+    const packageJson = JSON.parse(await readFile(join(process.cwd(), "package.json"), "utf8")) as {
+      dependencies?: Record<string, string>;
+    };
+
+    expect(packageJson.dependencies).toHaveProperty("chromadb");
+    expect(packageJson.dependencies).toHaveProperty("@chroma-core/default-embed");
+  });
+
   test("runs Chroma alongside the SSE server and passes semantic configuration", async () => {
     const compose = await readFile(join(process.cwd(), "docker-compose.yml"), "utf8");
 
@@ -27,12 +36,20 @@ describe("Docker Compose Chroma deployment", () => {
     expect(dockerfile).toContain("CMD [\"node\", \"scripts/start-sse.js\"]");
   });
 
+  test("SSE startup keeps running when Chroma sync is configured as non-blocking", async () => {
+    const startScript = await readFile(join(process.cwd(), "scripts", "start-sse.js"), "utf8");
+
+    expect(startScript).toContain("MCP_VARIABLE_CHROMA_SYNC_BLOCKING");
+    expect(startScript).toContain("runNodeScript(\"scripts/sync-chroma.mjs\", [csvPath], { fatal: false })");
+  });
+
   test("example environment file exposes Chroma compose knobs", async () => {
     const envExample = await readFile(join(process.cwd(), ".env.example"), "utf8");
 
     expect(envExample).toContain("MCP_VARIABLE_CHROMA_PUBLISHED_PORT=8000");
     expect(envExample).toContain("MCP_VARIABLE_CHROMA_COLLECTION=mcp_variable_terms");
     expect(envExample).toContain("MCP_VARIABLE_CHROMA_SYNC_ON_START=true");
+    expect(envExample).toContain("MCP_VARIABLE_CHROMA_SYNC_BLOCKING=false");
     expect(envExample).toContain("MCP_VARIABLE_CHROMA_STARTUP_TIMEOUT_MS=60000");
   });
 });
