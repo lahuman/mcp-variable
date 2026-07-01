@@ -10,6 +10,8 @@ describe("Docker Compose Chroma deployment", () => {
     expect(compose).toContain("chroma:");
     expect(compose).toContain("image: chromadb/chroma");
     expect(compose).toContain("mcp-variable-chroma");
+    expect(compose).toContain("chroma-data:/data");
+    expect(compose).toContain("grep -q ':1F40 .* 0A ' /proc/net/tcp /proc/net/tcp6");
     expect(compose).toContain("depends_on:");
     expect(compose).toContain("MCP_VARIABLE_CHROMA_HOST: chroma");
     expect(compose).toContain("MCP_VARIABLE_CHROMA_PORT: \"8000\"");

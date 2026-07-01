@@ -6,12 +6,12 @@ services:
     ports:
       - "${MCP_VARIABLE_CHROMA_PUBLISHED_PORT:-8000}:8000"
     volumes:
-      - chroma-data:/chroma/chroma
+      - chroma-data:/data
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v2/heartbeat', timeout=3)\" || python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/heartbeat', timeout=3)\""
+          "grep -q ':1F40 .* 0A ' /proc/net/tcp /proc/net/tcp6"
         ]
       interval: 10s
       timeout: 5s
