@@ -174,6 +174,7 @@ MCP_VARIABLE_CHROMA_PUBLISHED_PORT=8000
 MCP_VARIABLE_CHROMA_COLLECTION=mcp_variable_terms
 MCP_VARIABLE_CHROMA_SYNC_ON_START=true
 MCP_VARIABLE_CHROMA_SYNC_BLOCKING=false
+MCP_VARIABLE_CHROMA_BATCH_SIZE=32
 MCP_VARIABLE_CHROMA_STARTUP_TIMEOUT_MS=60000
 ```
 
@@ -194,6 +195,7 @@ MCP_VARIABLE_CSV_SOURCE=/absolute/path/to/terms.csv
 - `MCP_VARIABLE_CHROMA_COLLECTION`: `suggest_terms`가 조회할 Chroma 컬렉션 이름입니다.
 - `MCP_VARIABLE_CHROMA_SYNC_ON_START`: `true`이면 SSE 서버 시작 전에 CSV 내용을 Chroma 컬렉션으로 동기화합니다.
 - `MCP_VARIABLE_CHROMA_SYNC_BLOCKING`: `false`이면 Chroma 동기화를 백그라운드로 실행하고 SSE 서버를 먼저 띄웁니다. `true`이면 동기화가 성공해야 SSE 서버를 시작합니다.
+- `MCP_VARIABLE_CHROMA_BATCH_SIZE`: 한 번에 embedding/upsert할 문서 수입니다. Podman 로그에 `scripts/sync-chroma.mjs exited with SIGKILL`이 보이면 메모리 한도에 걸린 가능성이 높으므로 이 값을 `16` 또는 `8`로 낮춰 재시도합니다.
 - `MCP_VARIABLE_CHROMA_STARTUP_TIMEOUT_MS`: SSE 컨테이너가 Chroma 준비를 기다리는 최대 시간입니다.
 
 현재 배포에서 사용할 API 키를 서버에 설정하려면 `.env`에 다음처럼 넣습니다.

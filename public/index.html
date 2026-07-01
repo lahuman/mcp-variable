@@ -194,7 +194,9 @@ docker compose logs -f mcp-variable-sse</code></pre>
       <pre><code>MCP_VARIABLE_CHROMA_HOST=chroma
 MCP_VARIABLE_CHROMA_PORT=8000
 MCP_VARIABLE_CHROMA_COLLECTION=mcp_variable_terms
-MCP_VARIABLE_CHROMA_SYNC_ON_START=true</code></pre>
+MCP_VARIABLE_CHROMA_SYNC_ON_START=true
+MCP_VARIABLE_CHROMA_BATCH_SIZE=32</code></pre>
+      <p><code>scripts/sync-chroma.mjs exited with SIGKILL</code>이 반복되면 컨테이너 메모리 한도에 걸린 가능성이 높으므로 <code>MCP_VARIABLE_CHROMA_BATCH_SIZE</code>를 <code>16</code> 또는 <code>8</code>로 낮춰 재시도합니다.</p>
       <div class="note">Chroma 추천은 후보 탐색용입니다. 표준 변수명 확정은 계속 <code>convert_terms</code>의 사전 기반 <code>exact</code> 또는 <code>composed</code> 결과를 기준으로 판단합니다.</div>
     </section>
 

@@ -26,6 +26,7 @@ describe("Docker Compose Chroma deployment", () => {
     expect(compose).toContain("MCP_VARIABLE_CHROMA_PORT: \"8000\"");
     expect(compose).toContain("MCP_VARIABLE_CHROMA_COLLECTION: \"${MCP_VARIABLE_CHROMA_COLLECTION:-mcp_variable_terms}\"");
     expect(compose).toContain("MCP_VARIABLE_CHROMA_SYNC_ON_START: \"${MCP_VARIABLE_CHROMA_SYNC_ON_START:-true}\"");
+    expect(compose).toContain("MCP_VARIABLE_CHROMA_BATCH_SIZE: \"${MCP_VARIABLE_CHROMA_BATCH_SIZE:-32}\"");
     expect(compose).toContain("chroma-data:");
   });
 
@@ -41,6 +42,15 @@ describe("Docker Compose Chroma deployment", () => {
 
     expect(startScript).toContain("MCP_VARIABLE_CHROMA_SYNC_BLOCKING");
     expect(startScript).toContain("runNodeScript(\"scripts/sync-chroma.mjs\", [csvPath], { fatal: false })");
+    expect(startScript).toContain("MCP_VARIABLE_CHROMA_BATCH_SIZE");
+  });
+
+  test("Chroma sync defaults to a small embedding batch for memory-constrained containers", async () => {
+    const syncScript = await readFile(join(process.cwd(), "scripts", "sync-chroma.mjs"), "utf8");
+
+    expect(syncScript).toContain("const DEFAULT_CHROMA_BATCH_SIZE = 32");
+    expect(syncScript).toContain("event: \"chroma-sync-start\"");
+    expect(syncScript).toContain("event: \"chroma-sync-progress\"");
   });
 
   test("example environment file exposes Chroma compose knobs", async () => {
@@ -50,6 +60,7 @@ describe("Docker Compose Chroma deployment", () => {
     expect(envExample).toContain("MCP_VARIABLE_CHROMA_COLLECTION=mcp_variable_terms");
     expect(envExample).toContain("MCP_VARIABLE_CHROMA_SYNC_ON_START=true");
     expect(envExample).toContain("MCP_VARIABLE_CHROMA_SYNC_BLOCKING=false");
+    expect(envExample).toContain("MCP_VARIABLE_CHROMA_BATCH_SIZE=32");
     expect(envExample).toContain("MCP_VARIABLE_CHROMA_STARTUP_TIMEOUT_MS=60000");
   });
 });

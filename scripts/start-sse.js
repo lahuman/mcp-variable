@@ -85,7 +85,7 @@ function runNodeScript(script, args, options = { fatal: true }) {
         resolve();
         return;
       }
-      const error = new Error(`${script} exited with ${signal ?? code}`);
+      const error = new Error(formatScriptExit(script, code, signal));
       if (options.fatal) {
         reject(error);
         return;
@@ -94,6 +94,15 @@ function runNodeScript(script, args, options = { fatal: true }) {
       resolve();
     });
   });
+}
+
+function formatScriptExit(script, code, signal) {
+  let message = `${script} exited with ${signal ?? code}`;
+  if (script === "scripts/sync-chroma.mjs" && signal === "SIGKILL") {
+    message +=
+      "; Chroma sync was likely killed by the container memory limit. Lower MCP_VARIABLE_CHROMA_BATCH_SIZE or set MCP_VARIABLE_CHROMA_SYNC_ON_START=false.";
+  }
+  return message;
 }
 
 function readPositiveInteger(value, fallback) {

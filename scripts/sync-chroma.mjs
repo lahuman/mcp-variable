@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import { resolve } from "node:path";
 
+const DEFAULT_CHROMA_BATCH_SIZE = 32;
+const DEFAULT_PROGRESS_BATCH_INTERVAL = 25;
+
 const csvPath = process.argv[2] ? resolve(process.argv[2]) : resolve("data/terms.csv");
 const collectionName = process.env.MCP_VARIABLE_CHROMA_COLLECTION ?? "mcp_variable_terms";
 const host = process.env.MCP_VARIABLE_CHROMA_HOST ?? "localhost";
@@ -8,7 +11,7 @@ const port = process.env.MCP_VARIABLE_CHROMA_PORT ? Number(process.env.MCP_VARIA
 const ssl = process.env.MCP_VARIABLE_CHROMA_SSL === "true";
 const batchSize = process.env.MCP_VARIABLE_CHROMA_BATCH_SIZE
   ? Number(process.env.MCP_VARIABLE_CHROMA_BATCH_SIZE)
-  : 500;
+  : DEFAULT_CHROMA_BATCH_SIZE;
 
 if (!Number.isInteger(port) || port < 1 || port > 65_535) {
   throw new Error(`Invalid MCP_VARIABLE_CHROMA_PORT: ${process.env.MCP_VARIABLE_CHROMA_PORT}`);
@@ -36,6 +39,20 @@ const client = new ChromaClient({
 const embeddingFunction = new DefaultEmbeddingFunction();
 const collection = await getOrCreateCollection(client, collectionName, embeddingFunction);
 
+console.error(
+  JSON.stringify({
+    event: "chroma-sync-start",
+    csvPath,
+    collectionName,
+    rows: rows.length,
+    documents: documents.length,
+    batchSize,
+    host,
+    port,
+    ssl
+  })
+);
+
 for (let index = 0; index < documents.length; index += batchSize) {
   const batch = documents.slice(index, index + batchSize);
   await collection.upsert({
@@ -43,6 +60,7 @@ for (let index = 0; index < documents.length; index += batchSize) {
     documents: batch.map((item) => item.document),
     metadatas: batch.map((item) => item.metadata)
   });
+  logProgress(index, batch.length, documents.length, batchSize);
 }
 
 console.log(
@@ -52,6 +70,7 @@ console.log(
       collectionName,
       rows: rows.length,
       documents: documents.length,
+      batchSize,
       host,
       port,
       ssl
@@ -131,4 +150,21 @@ function buildMetadata(target, termName, physicalName, row) {
 
 function stripUndefined(value) {
   return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined));
+}
+
+function logProgress(index, syncedInBatch, total, batchSize) {
+  const batchNumber = Math.floor(index / batchSize) + 1;
+  const synced = Math.min(index + syncedInBatch, total);
+  if (batchNumber !== 1 && synced !== total && batchNumber % DEFAULT_PROGRESS_BATCH_INTERVAL !== 0) {
+    return;
+  }
+
+  console.error(
+    JSON.stringify({
+      event: "chroma-sync-progress",
+      synced,
+      total,
+      batchSize
+    })
+  );
 }
