@@ -7,9 +7,21 @@ type SuffixSplit = {
   domainPhysical: string;
 };
 
+type IndexedTermRow = {
+  row: TermRow;
+  physicalTokens: string[];
+};
+
+type DictionaryBuilderContext = {
+  rows: IndexedTermRow[];
+  wordTermsByPhysical: Map<string, string[]>;
+  domainTermsByPhysical: Map<string, string[]>;
+};
+
 const FORCED_DOMAIN_MAPPINGS = new Map<string, string>([["명", "NM"]]);
 
 export function buildDictionary(rows: TermRow[]): TermDictionary {
+  const context = createDictionaryBuilderContext(rows);
   const dictionary: TermDictionary = {
     rows,
     attributeByTerm: new Map(),
@@ -22,8 +34,8 @@ export function buildDictionary(rows: TermRow[]): TermDictionary {
   };
 
   const wordCandidates = new Map<string, Set<string>>();
-  for (const row of rows) {
-    const { termStem, physicalStemTokens } = getDomainTypeStemParts(row);
+  for (const { row, physicalTokens } of context.rows) {
+    const { termStem, physicalStemTokens } = getDomainTypeStemParts(row, physicalTokens);
     if (termStem && physicalStemTokens.length === 1) {
       addMapping(wordCandidates, termStem, physicalStemTokens[0]!);
     }
@@ -32,7 +44,7 @@ export function buildDictionary(rows: TermRow[]): TermDictionary {
   for (const [term, physicals] of wordCandidates.entries()) {
     for (const physical of physicals) {
       if (!hasShorterCandidateForPhysical(wordCandidates, term, physical)) {
-        addWordMapping(dictionary, term, physical);
+        addWordMapping(dictionary, term, physical, context);
       }
     }
   }
@@ -40,24 +52,23 @@ export function buildDictionary(rows: TermRow[]): TermDictionary {
   let changed = true;
   while (changed) {
     changed = false;
-    for (const row of rows) {
-      const split = splitBySuffixDomain(row.termName, splitPhysicalName(row.physicalName), dictionary);
+    for (const { row, physicalTokens } of context.rows) {
+      const split = splitBySuffixDomain(row.termName, physicalTokens, dictionary, context);
       if (split) {
         for (const component of split.wordComponents) {
-          changed = addWordMapping(dictionary, component.term, component.physical) || changed;
+          changed = addWordMapping(dictionary, component.term, component.physical, context) || changed;
         }
-        changed = addMapping(dictionary.domainTermToPhysical, split.domainTerm, split.domainPhysical) || changed;
-        changed = addMapping(dictionary.domainPhysicalToTerms, split.domainPhysical, split.domainTerm) || changed;
+        changed = addDomainMapping(dictionary, split.domainTerm, split.domainPhysical, context) || changed;
       }
     }
   }
 
-  applyForcedDomainMappings(dictionary);
+  applyForcedDomainMappings(dictionary, context);
 
   const attributeEntries: AttributeEntry[] = [];
-  for (const row of rows) {
+  for (const { row, physicalTokens } of context.rows) {
     const physical = normalizePhysicalName(row.physicalName);
-    const components = buildComponents(row, dictionary);
+    const components = buildComponents(row, physicalTokens, dictionary, context);
     const entry: AttributeEntry = {
       term: row.termName,
       physical,
@@ -79,7 +90,18 @@ export function buildDictionary(rows: TermRow[]): TermDictionary {
   return dictionary;
 }
 
-function applyForcedDomainMappings(dictionary: TermDictionary): void {
+function createDictionaryBuilderContext(rows: TermRow[]): DictionaryBuilderContext {
+  return {
+    rows: rows.map((row) => ({ row, physicalTokens: splitPhysicalName(row.physicalName) })),
+    wordTermsByPhysical: new Map(),
+    domainTermsByPhysical: new Map()
+  };
+}
+
+function applyForcedDomainMappings(
+  dictionary: TermDictionary,
+  context?: DictionaryBuilderContext
+): void {
   for (const [term, physical] of FORCED_DOMAIN_MAPPINGS.entries()) {
     const normalizedPhysical = normalizePhysicalName(physical);
     dictionary.domainTermToPhysical.set(term, new Set([normalizedPhysical]));
@@ -99,6 +121,7 @@ function applyForcedDomainMappings(dictionary: TermDictionary): void {
     reverseTerms.add(term);
     dictionary.domainPhysicalToTerms.set(normalizedPhysical, reverseTerms);
   }
+  context?.domainTermsByPhysical.clear();
 }
 
 export function getUniqueMapping(map: Map<string, Set<string>>, key: string): string | undefined {
@@ -123,9 +146,59 @@ export function addMapping(map: Map<string, Set<string>>, key: string, value: st
   return values.size > beforeSize;
 }
 
-function addWordMapping(dictionary: TermDictionary, term: string, physical: string): boolean {
+export function getSortedCandidateTermsByPhysical(
+  candidates: Map<string, Set<string>>,
+  physical: string
+): string[] {
+  const normalizedPhysical = normalizePhysicalName(physical);
+  return [...(candidates.get(normalizedPhysical) ?? [])].sort(compareCandidateTerms);
+}
+
+function getCachedSortedCandidateTermsByPhysical(
+  cache: Map<string, string[]>,
+  candidates: Map<string, Set<string>>,
+  physical: string
+): string[] {
+  const normalizedPhysical = normalizePhysicalName(physical);
+  const cached = cache.get(normalizedPhysical);
+  if (cached) {
+    return cached;
+  }
+
+  const sorted = getSortedCandidateTermsByPhysical(candidates, normalizedPhysical);
+  cache.set(normalizedPhysical, sorted);
+  return sorted;
+}
+
+function compareCandidateTerms(left: string, right: string): number {
+  return right.length - left.length || left.localeCompare(right, "ko-KR");
+}
+
+function addWordMapping(
+  dictionary: TermDictionary,
+  term: string,
+  physical: string,
+  context?: DictionaryBuilderContext
+): boolean {
   const addedTerm = addMapping(dictionary.termToPhysical, term, physical);
   const addedPhysical = addMapping(dictionary.physicalToTerms, physical, term);
+  if (addedTerm || addedPhysical) {
+    context?.wordTermsByPhysical.delete(normalizePhysicalName(physical));
+  }
+  return addedTerm || addedPhysical;
+}
+
+function addDomainMapping(
+  dictionary: TermDictionary,
+  term: string,
+  physical: string,
+  context: DictionaryBuilderContext
+): boolean {
+  const addedTerm = addMapping(dictionary.domainTermToPhysical, term, physical);
+  const addedPhysical = addMapping(dictionary.domainPhysicalToTerms, physical, term);
+  if (addedTerm || addedPhysical) {
+    context.domainTermsByPhysical.delete(normalizePhysicalName(physical));
+  }
   return addedTerm || addedPhysical;
 }
 
@@ -169,9 +242,13 @@ function hasShorterCandidateForPhysical(
   return false;
 }
 
-function buildComponents(row: TermRow, dictionary: TermDictionary): TermComponent[] {
-  const physicalTokens = splitPhysicalName(row.physicalName);
-  const split = splitBySuffixDomain(row.termName, physicalTokens, dictionary);
+function buildComponents(
+  row: TermRow,
+  physicalTokens: string[],
+  dictionary: TermDictionary,
+  context: DictionaryBuilderContext
+): TermComponent[] {
+  const split = splitBySuffixDomain(row.termName, physicalTokens, dictionary, context);
   if (split) {
     return [
       ...split.wordComponents,
@@ -192,11 +269,13 @@ function buildComponents(row: TermRow, dictionary: TermDictionary): TermComponen
   return [];
 }
 
-function getDomainTypeStemParts(row: TermRow): {
+function getDomainTypeStemParts(
+  row: TermRow,
+  physicalTokens = splitPhysicalName(row.physicalName)
+): {
   termStem: string;
   physicalStemTokens: string[];
 } {
-  const physicalTokens = splitPhysicalName(row.physicalName);
   const physicalStemTokens = physicalTokens.slice(0, -1);
   const termStem =
     row.domainType && row.termName.endsWith(row.domainType)
@@ -209,7 +288,8 @@ function getDomainTypeStemParts(row: TermRow): {
 function splitBySuffixDomain(
   termName: string,
   physicalTokens: string[],
-  dictionary: TermDictionary
+  dictionary: TermDictionary,
+  context: DictionaryBuilderContext
 ): SuffixSplit | undefined {
   const domainPhysical = physicalTokens.at(-1);
   if (!termName || !domainPhysical) {
@@ -233,15 +313,22 @@ function splitBySuffixDomain(
     termName,
     physicalStemTokens,
     domainPhysical,
-    dictionary
+    dictionary,
+    context
   );
   if (knownDomainSplit) {
     return knownDomainSplit;
   }
 
-  const wordComponents = segmentByTokens(termName, physicalStemTokens, dictionary, {
-    allowRemainder: true
-  });
+  const wordComponents = segmentByTokens(
+    termName,
+    physicalStemTokens,
+    dictionary,
+    {
+      allowRemainder: true
+    },
+    context
+  );
   if (!wordComponents) {
     return undefined;
   }
@@ -271,10 +358,13 @@ function splitByKnownDomainSuffix(
   termName: string,
   physicalStemTokens: string[],
   domainPhysical: string,
-  dictionary: TermDictionary
+  dictionary: TermDictionary,
+  context: DictionaryBuilderContext
 ): SuffixSplit | undefined {
-  const domainTerms = [...(dictionary.domainPhysicalToTerms.get(domainPhysical) ?? [])].sort(
-    (a, b) => b.length - a.length
+  const domainTerms = getCachedSortedCandidateTermsByPhysical(
+    context.domainTermsByPhysical,
+    dictionary.domainPhysicalToTerms,
+    domainPhysical
   );
 
   for (const domainTerm of domainTerms) {
@@ -283,7 +373,7 @@ function splitByKnownDomainSuffix(
     }
 
     const stem = termName.slice(0, -domainTerm.length);
-    const wordComponents = segmentKnownDomainStem(stem, physicalStemTokens, dictionary);
+    const wordComponents = segmentKnownDomainStem(stem, physicalStemTokens, dictionary, context);
     if (wordComponents) {
       return {
         wordComponents,
@@ -299,16 +389,28 @@ function splitByKnownDomainSuffix(
 function segmentKnownDomainStem(
   stem: string,
   physicalTokens: string[],
-  dictionary: TermDictionary
+  dictionary: TermDictionary,
+  context: DictionaryBuilderContext
 ): TermComponent[] | undefined {
-  const wordComponents = segmentByTokens(stem, physicalTokens, dictionary, {
-    allowRemainder: false
-  });
+  const wordComponents = segmentByTokens(
+    stem,
+    physicalTokens,
+    dictionary,
+    {
+      allowRemainder: false
+    },
+    context
+  );
   if (wordComponents) {
     return wordComponents;
   }
 
-  const inferredComponents = segmentByTokensWithSingleInferredWord(stem, physicalTokens, dictionary);
+  const inferredComponents = segmentByTokensWithSingleInferredWord(
+    stem,
+    physicalTokens,
+    dictionary,
+    context
+  );
   if (inferredComponents) {
     return inferredComponents;
   }
@@ -323,7 +425,8 @@ function segmentKnownDomainStem(
 function segmentByTokensWithSingleInferredWord(
   text: string,
   physicalTokens: string[],
-  dictionary: TermDictionary
+  dictionary: TermDictionary,
+  context: DictionaryBuilderContext
 ): TermComponent[] | undefined {
   if (!text || physicalTokens.length < 2) {
     return undefined;
@@ -357,8 +460,10 @@ function segmentByTokensWithSingleInferredWord(
     }
 
     const physicalToken = physicalTokens[tokenIndex]!;
-    const knownTerms = [...(dictionary.physicalToTerms.get(physicalToken) ?? [])].sort(
-      (a, b) => b.length - a.length
+    const knownTerms = getCachedSortedCandidateTermsByPhysical(
+      context.wordTermsByPhysical,
+      dictionary.physicalToTerms,
+      physicalToken
     );
 
     for (const term of knownTerms) {
@@ -403,10 +508,9 @@ function segmentByTokens(
   text: string,
   physicalTokens: string[],
   dictionary: TermDictionary,
-  options: { allowRemainder: boolean }
+  options: { allowRemainder: boolean },
+  context: DictionaryBuilderContext
 ): TermComponent[] | undefined {
-  const termsByLength = [...dictionary.termToPhysical.keys()].sort((a, b) => b.length - a.length);
-
   function visit(remaining: string, tokenIndex: number): TermComponent[] | undefined {
     if (tokenIndex === physicalTokens.length) {
       return options.allowRemainder || !remaining ? [] : undefined;
@@ -416,7 +520,12 @@ function segmentByTokens(
     }
 
     const physicalToken = physicalTokens[tokenIndex];
-    for (const term of termsByLength) {
+    const terms = getCachedSortedCandidateTermsByPhysical(
+      context.wordTermsByPhysical,
+      dictionary.physicalToTerms,
+      physicalToken ?? ""
+    );
+    for (const term of terms) {
       const physicals = dictionary.termToPhysical.get(term);
       if (!physicals?.has(physicalToken) || !remaining.startsWith(term)) {
         continue;

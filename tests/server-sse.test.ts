@@ -176,6 +176,10 @@ describe("SSE MCP server", () => {
     expect(index.body).toContain("/health");
     expect(index.body).toContain("/sse");
     expect(index.body).toContain("/messages");
+    expect(index.body).toContain("suggest_terms");
+    expect(index.body).toContain("Chroma");
+    expect(index.body).toContain("MCP_VARIABLE_CHROMA_HOST");
+    expect(index.body).toContain("docker compose up -d --build");
     expect(index.body).toContain("Authorization: Bearer &lt;api-key&gt;");
     expect(index.body).toContain("X-API-Key: &lt;api-key&gt;");
     expect(index.body).not.toContain("variable-mcp-with-dataportal");
@@ -210,7 +214,11 @@ describe("SSE MCP server", () => {
       await client.connect(transport);
 
       const tools = await client.listTools();
-      expect(tools.tools.map((tool) => tool.name)).toEqual(["convert_terms", "search_terms"]);
+      expect(tools.tools.map((tool) => tool.name)).toEqual([
+        "convert_terms",
+        "search_terms",
+        "suggest_terms"
+      ]);
 
       const result = await client.callTool({
         name: "convert_terms",

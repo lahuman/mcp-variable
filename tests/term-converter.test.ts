@@ -10,8 +10,12 @@ import {
   loadDictionaryWithCache,
   writeDictionaryCache
 } from "../src/cache.js";
-import { buildDictionary } from "../src/dictionary.js";
-import { createConvertTermsHandler, createSearchTermsHandler } from "../src/mcpTool.js";
+import { buildDictionary, getSortedCandidateTermsByPhysical } from "../src/dictionary.js";
+import {
+  createConvertTermsHandler,
+  createSearchTermsHandler,
+  createSuggestTermsHandler
+} from "../src/mcpTool.js";
 import { convertTerms } from "../src/matcher.js";
 import { searchTerms } from "../src/search.js";
 import { TermDictionaryService } from "../src/service.js";
@@ -122,6 +126,16 @@ describe("CSV loading", () => {
 });
 
 describe("dictionary building", () => {
+  test("sorts physical-token candidate terms by longest Korean term first", () => {
+    const candidates = new Map<string, Set<string>>([
+      ["DOC", new Set(["문", "문서", "문서분류"])],
+      ["TTL", new Set(["제목"])]
+    ]);
+
+    expect(getSortedCandidateTermsByPhysical(candidates, "doc")).toEqual(["문서분류", "문서", "문"]);
+    expect(getSortedCandidateTermsByPhysical(candidates, "missing")).toEqual([]);
+  });
+
   test("keeps exact attributes and creates verified word/domain mappings", () => {
     const dictionary = buildDictionary(rows);
 
@@ -1105,5 +1119,47 @@ describe("MCP tool handler", () => {
         text: JSON.stringify(result.structuredContent, null, 2)
       }
     ]);
+  });
+
+  test("returns disabled semantic suggestion content when Chroma is not configured", async () => {
+    const file = await writeTempCsv(
+      "tool-suggest",
+      csv([
+        "등록일자,REG_YMD,일자,일자V8,VARCHAR(8),,,공통,System,2026-07-01 10:00:00",
+        "등록일시,REG_DT,일시,일시V14,VARCHAR(14),,,공통,System,2026-07-01 10:00:00"
+      ])
+    );
+    const handler = createSuggestTermsHandler(new TermDictionaryService(file));
+
+    const result = await handler({
+      query: "등록날짜",
+      target: "term",
+      limit: 3
+    });
+
+    expect(result.structuredContent).toMatchObject({
+      query: "등록날짜",
+      target: "term",
+      limit: 3,
+      items: [],
+      warnings: [
+        "Semantic suggestions are disabled; configure Chroma to enable vector-based term recommendations."
+      ]
+    });
+    expect(result.content).toEqual([
+      {
+        type: "text",
+        text: JSON.stringify(result.structuredContent, null, 2)
+      }
+    ]);
+
+    const conversion = await createConvertTermsHandler(new TermDictionaryService(file))({
+      text: "등록일자",
+      direction: "term_to_physical"
+    });
+    expect(conversion.structuredContent).toMatchObject({
+      convertedText: "REG_YMD",
+      confidence: "exact"
+    });
   });
 });

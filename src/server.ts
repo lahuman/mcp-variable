@@ -10,8 +10,11 @@ import {
   convertTermsOutputSchema,
   createConvertTermsHandler,
   createSearchTermsHandler,
+  createSuggestTermsHandler,
   searchTermsInputSchema,
-  searchTermsOutputSchema
+  searchTermsOutputSchema,
+  suggestTermsInputSchema,
+  suggestTermsOutputSchema
 } from "./mcpTool.js";
 import { TermDictionaryService } from "./service.js";
 
@@ -36,6 +39,7 @@ export function createMcpServer(csvPath: string): McpServer {
   const service = new TermDictionaryService(csvPath);
   const convertHandler = createConvertTermsHandler(service);
   const searchHandler = createSearchTermsHandler(service);
+  const suggestHandler = createSuggestTermsHandler(service);
 
   server.registerTool(
     "convert_terms",
@@ -59,6 +63,18 @@ export function createMcpServer(csvPath: string): McpServer {
       outputSchema: searchTermsOutputSchema
     },
     async (input) => searchHandler(input)
+  );
+
+  server.registerTool(
+    "suggest_terms",
+    {
+      title: "Suggest Similar Terms",
+      description:
+        "Suggest similar registered terms, words, or domains using optional Chroma vector search. Deterministic conversion results are not changed by these suggestions.",
+      inputSchema: suggestTermsInputSchema,
+      outputSchema: suggestTermsOutputSchema
+    },
+    async (input) => suggestHandler(input)
   );
 
   return server;

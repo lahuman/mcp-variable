@@ -63,6 +63,62 @@ npm run build
 node dist/server.js --csv ./data/terms.csv
 ```
 
+## 캐시 사전 생성
+
+큰 CSV를 사용할 때는 MCP 서버 시작 전에 캐시를 미리 생성할 수 있습니다.
+
+```bash
+npm run build
+npm run cache:prebuild -- ./data/terms.csv
+```
+
+출력 예시:
+
+```json
+{
+  "source": "csv",
+  "rows": 13171,
+  "cachePath": "/path/to/data/.cache/terms.dic.json",
+  "cacheBytes": 20616367,
+  "ms": 230
+}
+```
+
+`source`가 `csv`이면 CSV에서 읽어 캐시를 새로 쓴 것이고, `cache`이면 기존 캐시를 사용한 것입니다.
+캐시는 정확 변환과 조합 변환을 위한 Map 기반 사전 인덱스이며, Chroma 같은 벡터 검색 결과는 확정 변환에 사용하지 않습니다.
+
+## Chroma 유사 추천 옵션
+
+`suggest_terms` 도구는 Chroma가 설정된 경우 비슷한 용어, 단어, 도메인을 추천합니다.
+이 결과는 후보 추천용이며 `convert_terms`의 `exact` 또는 `composed` confidence를 대체하지 않습니다.
+
+Chroma 서버를 로컬 파일 DB로 실행하려면 Chroma 문서 기준으로 별도 서버를 띄운 뒤 이 MCP 서버가 HTTP 클라이언트로 연결합니다.
+
+```bash
+npx chroma run --path ./.chroma
+```
+
+CSV 내용을 Chroma 컬렉션으로 동기화합니다.
+
+```bash
+npm run build
+MCP_VARIABLE_CHROMA_HOST=localhost \
+MCP_VARIABLE_CHROMA_PORT=8000 \
+MCP_VARIABLE_CHROMA_COLLECTION=mcp_variable_terms \
+npm run chroma:sync -- ./data/terms.csv
+```
+
+MCP 서버 실행 시에도 같은 Chroma 설정을 전달합니다.
+
+```bash
+MCP_VARIABLE_CHROMA_HOST=localhost \
+MCP_VARIABLE_CHROMA_PORT=8000 \
+MCP_VARIABLE_CHROMA_COLLECTION=mcp_variable_terms \
+node dist/server.js --csv ./data/terms.csv
+```
+
+설정하지 않으면 `suggest_terms`는 빈 `items`와 비활성 경고를 반환하고, 기존 `convert_terms`와 `search_terms`는 그대로 동작합니다.
+
 SSE 기반 HTTP 서버로 실행할 때:
 
 ```bash
@@ -81,7 +137,7 @@ CSV 경로 우선순위:
 
 ## Docker Compose로 SSE 서버 배포
 
-SSE 서버를 컨테이너로 빌드하고 백그라운드 실행할 때는 다음 명령을 사용합니다.
+SSE 서버와 Chroma 서버를 함께 빌드/실행할 때는 다음 명령을 사용합니다.
 
 ```bash
 cp .env.example .env
@@ -98,6 +154,8 @@ Docker Compose v1 환경에서는 같은 파일로 `docker-compose up -d --build
 - 메시지 POST 엔드포인트: `/messages`
 - 가이드 파일: `public/index.html`
 - 사전 파일: 호스트의 `./data/terms.csv`를 컨테이너의 `/app/data/terms.csv`로 읽기 전용 마운트
+- Chroma 서버: Compose의 `chroma` 서비스가 `chromadb/chroma` 이미지로 실행됩니다.
+- 시작 처리: `mcp-variable-sse` 컨테이너가 캐시를 미리 만들고 Chroma 컬렉션을 동기화한 뒤 SSE 서버를 시작합니다.
 
 `.env`에서 다음 값을 바꿀 수 있습니다.
 
@@ -111,6 +169,10 @@ MCP_VARIABLE_ALLOWED_ORIGINS=
 MCP_VARIABLE_MAX_SESSIONS=100
 MCP_VARIABLE_RATE_LIMIT_WINDOW_MS=60000
 MCP_VARIABLE_RATE_LIMIT_MAX=120
+MCP_VARIABLE_CHROMA_PUBLISHED_PORT=8000
+MCP_VARIABLE_CHROMA_COLLECTION=mcp_variable_terms
+MCP_VARIABLE_CHROMA_SYNC_ON_START=true
+MCP_VARIABLE_CHROMA_STARTUP_TIMEOUT_MS=60000
 ```
 
 다른 사전 파일을 사용하려면 `MCP_VARIABLE_CSV_SOURCE`에 호스트 기준 CSV 경로를 지정합니다.
@@ -126,6 +188,10 @@ MCP_VARIABLE_CSV_SOURCE=/absolute/path/to/terms.csv
 - `MCP_VARIABLE_MAX_SESSIONS`: 동시에 열 수 있는 SSE 세션 수입니다.
 - `MCP_VARIABLE_RATE_LIMIT_WINDOW_MS`: rate limit 집계 시간 창입니다.
 - `MCP_VARIABLE_RATE_LIMIT_MAX`: 시간 창 안에서 클라이언트별로 허용할 `/sse`, `/messages` 요청 수입니다.
+- `MCP_VARIABLE_CHROMA_PUBLISHED_PORT`: 호스트에서 Chroma에 접근할 포트입니다. 컨테이너 내부 SSE 서버는 항상 `chroma:8000`으로 연결합니다.
+- `MCP_VARIABLE_CHROMA_COLLECTION`: `suggest_terms`가 조회할 Chroma 컬렉션 이름입니다.
+- `MCP_VARIABLE_CHROMA_SYNC_ON_START`: `true`이면 SSE 서버 시작 전에 CSV 내용을 Chroma 컬렉션으로 동기화합니다.
+- `MCP_VARIABLE_CHROMA_STARTUP_TIMEOUT_MS`: SSE 컨테이너가 Chroma 준비를 기다리는 최대 시간입니다.
 
 현재 배포에서 사용할 API 키를 서버에 설정하려면 `.env`에 다음처럼 넣습니다.
 

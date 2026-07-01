@@ -9,6 +9,8 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "cache:prebuild": "node scripts/prebuild-cache.mjs",
+    "chroma:sync": "node scripts/sync-chroma.mjs",
     "convert:public-standard": "tsx scripts/convert-public-standard-terms.ts",
     "dev": "tsx src/server.ts",
     "dev:sse": "tsx src/server_sse.ts",
@@ -24,6 +26,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "chromadb": "^3.5.0",
     "csv-parse": "^5.5.6",
     "iconv-lite": "^0.6.3",
     "zod": "^4.0.0"

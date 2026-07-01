@@ -3,11 +3,14 @@ import { stat } from "node:fs/promises";
 import { loadDictionaryWithCache } from "./cache.js";
 import { convertTerms } from "./matcher.js";
 import { searchTerms } from "./search.js";
+import { createSemanticSuggestionService, type SemanticSuggestionService } from "./semantic.js";
 import type {
   ConvertTermsInput,
   ConvertTermsOutput,
   SearchTermsInput,
   SearchTermsOutput,
+  SuggestTermsInput,
+  SuggestTermsOutput,
   TermDictionary
 } from "./types.js";
 
@@ -16,7 +19,10 @@ export class TermDictionaryService {
   private loadedMtimeMs?: number;
   private loadedSize?: number;
 
-  constructor(private readonly csvPath: string) {}
+  constructor(
+    private readonly csvPath: string,
+    private readonly semanticSuggestionService: SemanticSuggestionService = createSemanticSuggestionService()
+  ) {}
 
   async convert(input: ConvertTermsInput): Promise<ConvertTermsOutput> {
     const reloadWarning = await this.ensureLoaded();
@@ -33,6 +39,18 @@ export class TermDictionaryService {
   async search(input: SearchTermsInput): Promise<SearchTermsOutput> {
     const reloadWarning = await this.ensureLoaded();
     const result = searchTerms(this.dictionary!, input);
+    if (reloadWarning) {
+      return {
+        ...result,
+        warnings: [...result.warnings, reloadWarning]
+      };
+    }
+    return result;
+  }
+
+  async suggest(input: SuggestTermsInput): Promise<SuggestTermsOutput> {
+    const reloadWarning = await this.ensureLoaded();
+    const result = await this.semanticSuggestionService.suggest(input, this.dictionary!);
     if (reloadWarning) {
       return {
         ...result,

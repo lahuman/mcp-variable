@@ -5,7 +5,9 @@ import type {
   ConvertTermsInput,
   ConvertTermsOutput,
   SearchTermsInput,
-  SearchTermsOutput
+  SearchTermsOutput,
+  SuggestTermsInput,
+  SuggestTermsOutput
 } from "./types.js";
 
 export const convertTermsInputSchema = z.object({
@@ -38,6 +40,15 @@ export const searchTermsInputSchema = z.object({
   matchMode: z.enum(["contains", "startsWith", "exact"]).default("contains").optional(),
   limit: z.number().int().min(0).max(100).default(20).optional(),
   offset: z.number().int().min(0).default(0).optional()
+});
+
+export const suggestTermsInputSchema = z.object({
+  query: z
+    .string()
+    .min(1)
+    .describe("Term, word, domain, or phrase to use for semantic recommendations."),
+  target: z.enum(["term", "word", "domain"]).default("term").optional(),
+  limit: z.number().int().min(0).max(50).default(5).optional()
 });
 
 const componentSchema = z.object({
@@ -123,6 +134,37 @@ export const searchTermsOutputSchema = z.object({
   warnings: z.array(z.string())
 });
 
+const suggestTermsItemOutputSchema = z.object({
+  id: z.string(),
+  target: z.enum(["term", "word", "domain"]),
+  termName: z.string(),
+  physicalName: z.string(),
+  score: z.number(),
+  reason: z.string(),
+  row: z
+    .object({
+      termName: z.string(),
+      physicalName: z.string(),
+      domainType: z.string(),
+      domain: z.string(),
+      dataType: z.string(),
+      codeName: z.string().optional(),
+      definition: z.string().optional(),
+      requestTask: z.string().optional(),
+      finalRequester: z.string().optional(),
+      finalModifiedAt: z.string().optional()
+    })
+    .optional()
+});
+
+export const suggestTermsOutputSchema = z.object({
+  query: z.string(),
+  target: z.enum(["term", "word", "domain"]),
+  limit: z.number().int().nonnegative(),
+  items: z.array(suggestTermsItemOutputSchema),
+  warnings: z.array(z.string())
+});
+
 export type ConvertTermsToolResult = {
   content: Array<{ type: "text"; text: string }>;
   structuredContent: ConvertTermsOutput & Record<string, unknown>;
@@ -131,6 +173,11 @@ export type ConvertTermsToolResult = {
 export type SearchTermsToolResult = {
   content: Array<{ type: "text"; text: string }>;
   structuredContent: SearchTermsOutput & Record<string, unknown>;
+};
+
+export type SuggestTermsToolResult = {
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: SuggestTermsOutput & Record<string, unknown>;
 };
 
 export function createConvertTermsHandler(
@@ -155,6 +202,19 @@ export function createSearchTermsHandler(
     return {
       content: [{ type: "text", text: JSON.stringify(output, null, 2) }],
       structuredContent: output as SearchTermsOutput & Record<string, unknown>
+    };
+  };
+}
+
+export function createSuggestTermsHandler(
+  service: TermDictionaryService
+): (input: SuggestTermsInput) => Promise<SuggestTermsToolResult> {
+  return async (input: SuggestTermsInput) => {
+    const parsed = suggestTermsInputSchema.parse(input);
+    const output = await service.suggest(parsed);
+    return {
+      content: [{ type: "text", text: JSON.stringify(output, null, 2) }],
+      structuredContent: output as SuggestTermsOutput & Record<string, unknown>
     };
   };
 }

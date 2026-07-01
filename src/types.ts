@@ -6,6 +6,7 @@ export type ComponentRole = "word" | "domain";
 export type MatchType = "attribute" | "word" | "domain";
 export type SearchMatchMode = "contains" | "startsWith" | "exact";
 export type SearchMatchType = "contains" | "startsWith" | "exact";
+export type SuggestTarget = "term" | "word" | "domain";
 export type SearchableTermField =
   | "termName"
   | "physicalName"
@@ -137,5 +138,29 @@ export interface SearchTermsOutput {
   limit: number;
   offset: number;
   items: SearchTermsItem[];
+  warnings: string[];
+}
+
+export interface SuggestTermsInput {
+  query: string;
+  target?: SuggestTarget;
+  limit?: number;
+}
+
+export interface SuggestTermsItem {
+  id: string;
+  target: SuggestTarget;
+  termName: string;
+  physicalName: string;
+  score: number;
+  reason: string;
+  row?: TermRow;
+}
+
+export interface SuggestTermsOutput {
+  query: string;
+  target: SuggestTarget;
+  limit: number;
+  items: SuggestTermsItem[];
   warnings: string[];
 }

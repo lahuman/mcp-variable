@@ -1,0 +1,36 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
+import { describe, expect, test } from "vitest";
+
+describe("Docker Compose Chroma deployment", () => {
+  test("runs Chroma alongside the SSE server and passes semantic configuration", async () => {
+    const compose = await readFile(join(process.cwd(), "docker-compose.yml"), "utf8");
+
+    expect(compose).toContain("chroma:");
+    expect(compose).toContain("image: chromadb/chroma");
+    expect(compose).toContain("mcp-variable-chroma");
+    expect(compose).toContain("depends_on:");
+    expect(compose).toContain("MCP_VARIABLE_CHROMA_HOST: chroma");
+    expect(compose).toContain("MCP_VARIABLE_CHROMA_PORT: \"8000\"");
+    expect(compose).toContain("MCP_VARIABLE_CHROMA_COLLECTION: \"${MCP_VARIABLE_CHROMA_COLLECTION:-mcp_variable_terms}\"");
+    expect(compose).toContain("MCP_VARIABLE_CHROMA_SYNC_ON_START: \"${MCP_VARIABLE_CHROMA_SYNC_ON_START:-true}\"");
+    expect(compose).toContain("chroma-data:");
+  });
+
+  test("runtime image includes scripts needed for cache prebuild and Chroma sync", async () => {
+    const dockerfile = await readFile(join(process.cwd(), "Dockerfile"), "utf8");
+
+    expect(dockerfile).toContain("COPY --from=build --chown=node:node /app/scripts ./scripts");
+    expect(dockerfile).toContain("CMD [\"node\", \"scripts/start-sse.js\"]");
+  });
+
+  test("example environment file exposes Chroma compose knobs", async () => {
+    const envExample = await readFile(join(process.cwd(), ".env.example"), "utf8");
+
+    expect(envExample).toContain("MCP_VARIABLE_CHROMA_PUBLISHED_PORT=8000");
+    expect(envExample).toContain("MCP_VARIABLE_CHROMA_COLLECTION=mcp_variable_terms");
+    expect(envExample).toContain("MCP_VARIABLE_CHROMA_SYNC_ON_START=true");
+    expect(envExample).toContain("MCP_VARIABLE_CHROMA_STARTUP_TIMEOUT_MS=60000");
+  });
+});
